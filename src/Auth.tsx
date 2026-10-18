@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { supabase } from './supabase'
+import { configured, supabase } from './supabase'
 import { Brand } from './ui'
 
 export default function Auth({ mode, back }: { mode: 'in' | 'up'; back: () => void }) {
@@ -12,6 +12,7 @@ export default function Auth({ mode, back }: { mode: 'in' | 'up'; back: () => vo
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     setMsg('')
+    if (!configured) { setBad(false); setMsg('Accounts are opening soon. Please check back shortly.'); return }
     if (up) {
       const { data, error } = await supabase.auth.signUp({ email, password })
       setBad(!!error)
