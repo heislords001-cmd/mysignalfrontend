@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { supabase } from './supabase'
+import { configured, supabase } from './supabase'
+import SetupNeeded from './SetupNeeded'
 import Landing from './Landing'
 import Auth from './Auth'
 import Home from './Home'
@@ -52,10 +53,12 @@ export default function App() {
   const [ready, setReady] = useState(false)
   const [view, setView] = useState<'landing' | 'in' | 'up'>('landing')
   useEffect(() => {
+    if (!configured) return
     supabase.auth.getSession().then(({ data }) => { setSession(data.session); setReady(true) })
     const { data } = supabase.auth.onAuthStateChange((_e, s) => { setSession(s); if (!s) setView('landing') })
     return () => data.subscription.unsubscribe()
   }, [])
+  if (!configured) return <SetupNeeded hasUrl={!!import.meta.env.VITE_SUPABASE_URL} hasKey={!!import.meta.env.VITE_SUPABASE_ANON_KEY} />
   if (!ready) return null
   if (session) return <Shell session={session} />
   return view === 'landing' ? <Landing onAuth={setView} /> : <Auth mode={view} back={() => setView('landing')} />
