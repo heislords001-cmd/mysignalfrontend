@@ -4,9 +4,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node api.js && vite",
     "prebuild": "python3 make_member_bot.py || python make_member_bot.py || echo skipped",
-    "build": "tsc && vite build",
+    "build": "node api.js && tsc && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
