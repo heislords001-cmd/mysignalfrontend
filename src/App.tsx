@@ -39,7 +39,7 @@ function Shell({ session }: { session: Session }) {
         <div className="bar"><Brand /><button className="btn sm" onClick={() => supabase.auth.signOut()}><Icon n="out" />Sign out</button></div>
         {tab === 'home' && <Home admin={admin} access={access} goPlan={() => setTab('pro')} />}
         {tab === 'sig' && <Signals access={access} goPlan={() => setTab('pro')} />}
-        {tab === 'bot' && <Bot uid={profile.id} botAccess={botAccess} goPlan={() => setTab('pro')} />}
+        {tab === 'bot' && <Bot uid={profile.id} admin={admin} botAccess={botAccess} goPlan={() => setTab('pro')} />}
         {tab === 'pro' && <Profile profile={profile} sub={sub} botAccess={botAccess} refresh={refresh} />}
       </div>
       <nav className="tabs">{tabs.map(([k, ic, l]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}><Icon n={ic} />{l}</button>)}</nav>

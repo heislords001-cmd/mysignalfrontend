@@ -30,3 +30,18 @@ Members paste their Deriv API key in the Bot tab. It is encrypted on the server 
   Keep a private copy: if you lose it, saved keys cannot be read and members must paste them again.
 - `DERIV_APP_ID`: optional. `1089` is Deriv's public test id. Register your own at Deriv for real use.
 After adding them, press Redeploy.
+
+## Auto-trading bot (Deriv)
+When the scanner saves a signal, Supabase calls `/api/execute` on this site, and the bot places a trade on every member's Deriv account that has the bot ON.
+Safety rules built in: only approved signals; DEMO Deriv accounts only for now (real accounts are refused); the stake is capped at $10; the stop loss can lose at most half of the stake; limits on open trades and trades per day; one trade per signal per member.
+This has NOT been tested against the real Deriv yet. Start on a Deriv demo account and watch the "Trades sent" list in the Bot tab.
+
+Setup, after the Deriv key steps above:
+1. In Vercel add `WEBHOOK_SECRET` (any long random text, as a Secret) and press Redeploy.
+2. In Supabase: Database, then Webhooks, then Create a new hook:
+   - Table `signals`, event `Insert`
+   - Type HTTP Request, method POST, URL `https://YOUR-SITE.vercel.app/api/execute`
+   - Add an HTTP header named `Authorization` with the value `Bearer ` followed by your WEBHOOK_SECRET
+3. Run `migration-2.sql` and `migration-3.sql` in the SQL Editor (once each).
+4. In the Bot tab: paste your Deriv demo API key, press Turn bot on.
+As admin you can also tick "Also trade untested signals" to forward-test on your own demo account.
