@@ -7,6 +7,12 @@ interface Req { method?: string; headers: Record<string, string | undefined>; bo
 interface Res { status(c: number): Res; json(b: unknown): void }
 
 export default async function handler(req: Req, res: Res) {
+  try { return await run(req, res) } catch (e) { return res.status(500).json({ error: `The server hit an error: ${(e as Error).message}` }) }
+}
+
+async function run(req: Req, res: Res) {
+  const missing = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'TOKEN_ENCRYPTION_KEY'].filter((k) => !process.env[k])
+  if (missing.length) return res.status(500).json({ error: `A server setting is missing in Vercel: ${missing.join(', ')}. Add it as a Secret, then press Redeploy.` })
   const jwt = (req.headers.authorization ?? '').replace('Bearer ', '')
   if (!jwt) return res.status(401).json({ error: 'Please sign in again.' })
   const sb = process.env.SUPABASE_URL!, key = process.env.SUPABASE_SERVICE_KEY!
@@ -43,6 +49,11 @@ export default async function handler(req: Req, res: Res) {
     method: 'POST', headers: merge,
     body: JSON.stringify({ user_id: user.id, broker: 'deriv', loginid: v.ok ? v.loginid : null, is_virtual: v.ok ? v.isVirtual : null, currency: v.ok ? v.currency : null, status: v.ok ? 'verified' : 'unverified', linked_at: new Date().toISOString() }),
   })
-  if (!s1.ok || !s2.ok) return res.status(500).json({ error: 'Could not save the key. Try again.' })
+  if (!s1.ok || !s2.ok) {
+    const bad = !s1.ok ? s1 : s2
+    const txt = await bad.text().catch(() => '')
+    const noTable = /does not exist|PGRST205|42P01|schema cache/i.test(txt)
+    return res.status(500).json({ error: noTable ? 'The database is missing a table. Run migration-2.sql in the Supabase SQL Editor.' : `The database refused the save (status ${bad.status}).` })
+  }
   return res.status(200).json({ ok: true, status: v.ok ? 'verified' : 'unverified', note: v.ok ? undefined : v.message })
 }
