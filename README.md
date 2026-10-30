@@ -59,3 +59,11 @@ Setup, in addition to the signal webhook:
 2. Upload the new backend files too (the scanner has to save `market_state`).
 3. In Supabase, Database, Webhooks, create a SECOND hook: table `market_state`, events `Insert` and `Update`, method POST, URL `https://YOUR-SITE.vercel.app/api/scalp`, and the same `Authorization` header as the first hook.
 4. In the Bot tab, switch Scalp mode on and press Save.
+
+## Check that the server functions are alive
+Open `https://YOUR-SITE.vercel.app/api/ping` in a browser. You should see `{"ok":true, ...}` with a yes/no for each Vercel setting. If you get a 404 or a 500, the functions are not deployed or are crashing: the Vercel deploy log will name the file, because every deploy now runs a check that loads each function first.
+
+## Results (profit and loss)
+The Bot tab has a **Results** card: finished trades, win rate, net profit or loss, today, signals vs scalps, and trades still open with their floating profit. It updates from Deriv whenever the tab opens and once a minute after that (or press Update). Each time, `/api/deriv-results` asks Deriv how every unsettled trade stands and saves the final profit or loss. The member's key is only ever sent to Deriv.
+Setup: run `migration-5.sql` in the Supabase SQL Editor (once), then redeploy this website.
+Profit is what Deriv paid out minus the stake, after Deriv's fees. Demo money only.

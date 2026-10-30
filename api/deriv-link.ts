@@ -1,7 +1,7 @@
 // Vercel function: saves (POST) or removes (DELETE) a member's Deriv API key. The key is encrypted before it is stored
 // and is never sent back to the browser.
-import { encrypt } from './_crypto'
-import { derivAuthorize } from './_deriv'
+import { encrypt } from './_crypto.js'
+import { derivAuthorize } from './_deriv.js'
 
 interface Req { method?: string; headers: Record<string, string | undefined>; body?: { token?: string } }
 interface Res { status(c: number): Res; json(b: unknown): void }

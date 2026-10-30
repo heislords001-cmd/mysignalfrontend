@@ -1,6 +1,6 @@
 // Vercel function for the admin's "System check" button: reports which settings and database pieces are in place.
 // It returns only yes/no answers and never any secret value.
-import { dbHeaders, env as serverEnv, userFromJwt } from './_auth'
+import { dbHeaders, env as serverEnv, userFromJwt } from './_auth.js'
 
 interface Req { method?: string; headers: Record<string, string | undefined> }
 interface Res { status(c: number): Res; json(b: unknown): void }

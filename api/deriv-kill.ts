@@ -1,7 +1,7 @@
 // Vercel function: the kill switch. Sells every open multiplier trade on the member's Deriv account and turns their bot off.
-import { decrypt } from './_crypto'
-import { dbHeaders, env, hasBotAccess, userFromJwt } from './_auth'
-import { DerivSession } from './_trade'
+import { decrypt } from './_crypto.js'
+import { dbHeaders, env, hasBotAccess, userFromJwt } from './_auth.js'
+import { DerivSession } from './_trade.js'
 
 interface Req { method?: string; headers: Record<string, string | undefined> }
 interface Res { status(c: number): Res; json(b: unknown): void }
