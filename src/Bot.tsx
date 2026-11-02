@@ -18,6 +18,7 @@ export function DerivLink({ uid, onLink }: { uid: string; onLink?: (l: BrokerLin
   const [msg, setMsg] = useState('')
   const [bad, setBad] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [test, setTest] = useState('')
   const load = useCallback(() => { supabase.from('broker_links').select('*').eq('user_id', uid).maybeSingle().then(({ data }) => setLink((data as BrokerLink | null) ?? null)) }, [uid])
   useEffect(() => { load() }, [load])
   useEffect(() => { if (link !== undefined) onLink?.(link) }, [link, onLink])
@@ -33,7 +34,26 @@ export function DerivLink({ uid, onLink }: { uid: string; onLink?: (l: BrokerLin
     setBusy(true); setMsg('')
     const { ok, out } = await call('POST', { token: key })
     setBusy(false); setBad(!ok)
-    if (ok) { setKey(''); setMsg(out.status === 'verified' ? 'Connected.' : `Saved, but not checked yet. ${out.note ?? ''}`); load() } else setMsg(out.error ?? 'Could not save the key.')
+    if (ok) {
+      setKey('')
+      setMsg(out.status === 'verified' ? 'Connected. Turning the bot on...' : `Saved, but not checked yet. ${out.note ?? ''}`)
+      load()
+      if (out.status === 'verified') {
+        // auto-start on demo: write bot_on=true for this member
+        await supabase.from('bot_state').upsert({ user_id: uid, bot_on: true }, { onConflict: 'user_id' })
+        setMsg('Connected. Bot is now on and will trade your Deriv demo account.')
+        onLink?.({ loginid: null, is_virtual: true, currency: null, status: 'verified', linked_at: new Date().toISOString() })
+      }
+    } else setMsg(out.error ?? 'Could not save the key.')
+  }
+  const sendTest = async () => {
+    setBusy(true); setTest('')
+    const { data } = await supabase.auth.getSession()
+    const res = await fetch('/api/test-trade', { method: 'POST', headers: { Authorization: `Bearer ${data.session?.access_token ?? ''}` } })
+    const out = (await res.json().catch(() => null)) as { ok?: boolean; status?: string; message?: string; error?: string } | null
+    setBusy(false)
+    if (!out || !res.ok) { setTest(out?.error ?? `The test could not run (status ${res.status}).`); return }
+    setTest(`${out.status === 'bought' ? 'Placed' : out.status === 'failed' ? 'Failed' : 'Skipped'}: ${out.message}`)
   }
   const remove = async () => { setBusy(true); await call('DELETE'); setBusy(false); setMsg('Key removed.'); setBad(false); load() }
   if (link === undefined) return null
@@ -43,7 +63,12 @@ export function DerivLink({ uid, onLink }: { uid: string; onLink?: (l: BrokerLin
       <div className="row ml"><span className="mu">Account</span><b>{link.loginid ?? 'not read yet'}{link.is_virtual != null && <span className="tg">{link.is_virtual ? 'Demo' : 'Real'}</span>}</b></div>
       <p className="mu">Your key is saved encrypted on our server and is never shown again. When the bot is on, it places each approved signal as a trade on this account. Demo accounts only for now.</p>
       {msg && <p className={bad ? 'err' : 'mu'}>{msg}</p>}
-      <button className="btn sm" disabled={busy} onClick={remove}>Remove key</button>
+      <p className="row" style={{ justifyContent: 'flex-start', gap: 8, margin: 0 }}>
+        <button className="btn sm brown" disabled={busy} onClick={sendTest}>Send a test trade</button>
+        <button className="btn sm" disabled={busy} onClick={remove}>Remove key</button>
+      </p>
+      <p className="mu">The test places one small trade (your stake, 1 USD or more) on your Deriv demo account right now, with the same rules as a real signal. It shows plainly whether it was placed, skipped or failed.</p>
+      {test && <p className={test.startsWith('Placed') ? 'ok' : 'err'}>{test}</p>}
     </div>
   )
   return (
@@ -119,7 +144,7 @@ export function ExecList({ uid }: { uid: string }) {
   const title = (r: Exec) => r.signals ? `${r.signals.symbol} ${r.signals.side}${r.signals.timeframe ? ` · ${r.signals.timeframe}` : ''}` : r.symbol ? `${r.symbol} ${r.side ?? ''}`.trim() : 'Trade'
   return (
     <div className="card"><h3>Trades sent</h3>
-      {rows.length === 0 && <p className="mu">Nothing yet. A trade appears here each time the bot acts on a signal or opens a scalp.</p>}
+      {rows.length === 0 && <p className="mu">Nothing yet. A trade appears here each time the bot acts on a signal or opens a scalp. If the bot is on and nothing shows: strategies may not have passed yet (signals are Untested), or the webhook may not be set up. Use Send a test trade to check the connection.</p>}
       {rows.map((r) => (
         <div className="sig" key={r.id}>
           <span className={`badge ${r.status === 'bought' ? 'win' : r.status === 'failed' ? 'loss' : 'open'}`}>{r.status === 'bought' ? 'Placed' : r.status === 'failed' ? 'Failed' : 'Skipped'}</span>

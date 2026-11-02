@@ -81,6 +81,18 @@ export async function executeScalp(mk: Market): Promise<Tally> {
   return runOrder({ kind: 'scalp', key: `scalp:${mk.symbol}:${mk.updated_at}`, signalId: null, symbol: mk.symbol, side: plan.side, entry: plan.entry, sl: plan.sl, tp1: plan.tp1 }, eligible, m)
 }
 
+/** One safe demo trade on the member's own account, without waiting for a signal or a webhook. Uses the same rules as a real signal. */
+export async function executeTest(userId: string): Promise<{ status: string; message: string }> {
+  const secret = (await rest(`broker_secrets?user_id=eq.${userId}&select=data`)) as Row[]
+  if (!secret[0]) return { status: 'skipped', message: 'Connect your Deriv key first.' }
+  const cfg = (((await rest(`user_settings?user_id=eq.${userId}&select=data`)) as Row[])[0]?.data ?? {}) as Row
+  const key = `test:${userId}:${new Date().toISOString().slice(0, 16)}`
+  const r = await placeForMember(userId, { kind: 'signal', key, signalId: null, symbol: 'EURUSD', side: 'buy', entry: 1.1, sl: 1.098, tp1: 1.103 }, secret[0].data, cfg)
+  if (r === 'duplicate') return { status: 'skipped', message: 'A test was just sent. Wait a minute before sending another.' }
+  const row = ((await rest(`executions?user_id=eq.${userId}&dedupe_key=eq.${encodeURIComponent(key)}&select=status,message`)) as Row[])[0]
+  return { status: row?.status ?? r, message: row?.message ?? '' }
+}
+
 async function placeForMember(userId: string, o: Order, secret: string, cfg: Row): Promise<Result> {
   // claim this (member, signal or market reading) first: if it already exists, another delivery handled it, so do nothing
   const claim = await rest('executions?on_conflict=user_id,dedupe_key', {
