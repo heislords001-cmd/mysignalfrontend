@@ -45,7 +45,7 @@ export class DerivSession {
     ws.onclose = drop
   }
   static open(appId: string, timeoutMs = 10000): Promise<DerivSession> {
-    const WS = (globalThis as unknown as { WebSocket?: new (u: string) => WS }).WebSocket
+    const WS = (globalThis as any).WebSocket ?? (() => { try { return require('ws') } catch { return undefined } })()
     return new Promise((resolve, reject) => {
       if (!WS) return reject(new Error('This server cannot open a WebSocket.'))
       let ws: WS

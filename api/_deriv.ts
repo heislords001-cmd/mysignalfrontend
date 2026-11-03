@@ -3,8 +3,17 @@ export type DerivResult =
   | { ok: true; loginid: string; isVirtual: boolean; currency: string }
   | { ok: false; reason: 'invalid' | 'unreachable'; message: string }
 
+// Deriv WebSocket helper. Uses native WebSocket (Node 22+) or falls back to the 'ws' package.
+let _WS: typeof WebSocket
+try {
+  // Native WebSocket is available in Node 22+
+  _WS = (globalThis as any).WebSocket ?? require('ws')
+} catch {
+  _WS = (globalThis as any).WebSocket
+}
+
 export function derivAuthorize(token: string, appId: string, timeoutMs = 8000): Promise<DerivResult> {
-  const WS = (globalThis as unknown as { WebSocket?: new (url: string) => any }).WebSocket
+  const WS = _WS
   return new Promise((resolve) => {
     if (!WS) return resolve({ ok: false, reason: 'unreachable', message: 'This server cannot open a WebSocket.' })
     let done = false

@@ -1,0 +1,10 @@
+{
+  "framework": "vite",
+  "functions": {
+    "api/*.ts": {
+      "runtime": "nodejs22.x"
+    }
+  },
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist"
+}
