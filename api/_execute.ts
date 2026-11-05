@@ -107,7 +107,6 @@ async function placeForMember(userId: string, o: Order, secret: string, cfg: Row
     return status
   }
   const scalp = o.kind === 'scalp'
-  let session: DerivSession | null = null
   try {
     const stake = clamp(scalp ? cfg.scalp_stake_usd ?? cfg.stake_usd : cfg.stake_usd, MIN_STAKE, MAX_STAKE, MIN_STAKE)
     const maxOpen = Math.round(scalp ? clamp(cfg.scalp_max_open, 1, 20, 6) : clamp(cfg.max_open, 1, 10, 3) + (cfg.scalp_enabled === true ? clamp(cfg.scalp_max_open, 1, 20, 6) : 0))
@@ -117,34 +116,38 @@ async function placeForMember(userId: string, o: Order, secret: string, cfg: Row
     const today = (await rest(`executions?user_id=eq.${userId}&status=eq.bought&kind=eq.${o.kind}&created_at=gte.${midnight.toISOString()}&select=id`)) as Row[]
     if (today.length >= dailyMax) return await finish('skipped', `Daily limit of ${dailyMax} ${o.kind} trades reached.`)
 
-    session = await DerivSession.open(process.env.DERIV_APP_ID || '1089')
-    const auth = await session.request({ authorize: decrypt(secret) })
-    if (auth.error) return await finish('failed', `Deriv refused the key: ${errText(auth)}`)
-    if (!auth.authorize?.is_virtual) return await finish('skipped', 'Real accounts are locked for now. Connect a Deriv demo account.')   // demo-only gate, checked live
-    const currency = String(auth.authorize.currency || 'USD')
+    // --- Deriv REST API (new flow) ---
+    // Get the account_id stored when the key was verified
+    const linkRow = (await rest(`broker_links?user_id=eq.${userId}&select=loginid,currency`)) as Row[]
+    const accountId = linkRow[0]?.loginid ?? null
+    const currency = String(linkRow[0]?.currency ?? 'USD')
+    if (!accountId) return await finish('skipped', 'Deriv account not linked yet. Remove your key and paste it again.')
 
-    const pf = await session.request({ portfolio: 1 })
-    const openList = ((pf.portfolio?.contracts ?? []) as Row[]).filter((c) => String(c.contract_type ?? '').startsWith('MULT'))
-    if (openList.length >= maxOpen) return await finish('skipped', `Already ${openList.length} trades open (limit ${maxOpen}).`)
-    if (scalp && openList.filter((c) => c.symbol === SYMBOLS[o.symbol]).length >= perPair) return await finish('skipped', `Already ${perPair} scalps open on ${o.symbol}.`)
+    // Open limit check using executions (we no longer need portfolio from WebSocket for this)
+    const openTrades = (await rest(`executions?user_id=eq.${userId}&status=eq.bought&closed_at=is.null&select=id,symbol`)) as Row[]
+    const openMult = openTrades.length
+    if (openMult >= maxOpen) return await finish('skipped', `Already ${openMult} trades open (limit ${maxOpen}).`)
+    if (scalp && openTrades.filter((r) => r.symbol === o.symbol).length >= perPair) return await finish('skipped', `Already ${perPair} scalps open on ${o.symbol}.`)
 
-    const cf = await session.request({ contracts_for: SYMBOLS[o.symbol], product_type: 'basic' })
-    const type = o.side === 'buy' ? 'MULTUP' : 'MULTDOWN'
-    const multipliers = ((cf.contracts_for?.available ?? []) as Row[]).filter((c) => c.contract_type === type && Array.isArray(c.multiplier_range)).flatMap((c) => c.multiplier_range as number[])
-    const plan = planTrade({ side: o.side, entry: o.entry, sl: o.sl, tp1: o.tp1 }, stake, multipliers.length ? multipliers : [100])
+    // Size the trade
+    const plan = planTrade({ side: o.side, entry: o.entry, sl: o.sl, tp1: o.tp1 }, stake, [30, 50, 100, 200, 300, 500])
     if (!plan.ok) return await finish('skipped', plan.reason)
 
-    const prop = await session.request({
-      proposal: 1, amount: stake, basis: 'stake', contract_type: plan.contract_type, currency, symbol: SYMBOLS[o.symbol],
-      multiplier: plan.multiplier, limit_order: { stop_loss: plan.stop_loss, take_profit: plan.take_profit },
+    // Place via REST bulk-purchase/demo
+    const trade = await placeMultiplier({
+      token: decrypt(secret), accountId, symbol: SYMBOLS[o.symbol],
+      side: o.side as 'buy' | 'sell', stake, multiplier: plan.multiplier,
+      stopLoss: plan.stop_loss, takeProfit: plan.take_profit, currency,
     })
-    if (prop.error || !prop.proposal?.id) return await finish('failed', `Deriv would not quote it: ${errText(prop)}`)
-    const buy = await session.request({ buy: prop.proposal.id, price: Number(prop.proposal.ask_price ?? stake) })
-    if (buy.error || !buy.buy?.contract_id) return await finish('failed', `Deriv did not accept the trade: ${errText(buy)}`)
-    return await finish('bought', `${scalp ? 'Scalp b' : 'B'}ought ${plan.contract_type} x${plan.multiplier}.`, { contract_id: buy.buy.contract_id, stake, stop_loss: plan.stop_loss, take_profit: plan.take_profit, multiplier: plan.multiplier })
+    if (!trade.ok) {
+      const failed = trade.code === 'stake_out_of_range' || trade.code === 'stop_too_wide' || trade.code === 'no_app_id'
+      return await finish(failed ? 'skipped' : 'failed', trade.message)
+    }
+    return await finish('bought', `${scalp ? 'Scalp b' : 'B'}ought ${plan.contract_type} x${plan.multiplier}.`, {
+      contract_id: trade.data.contractId, stake, stop_loss: plan.stop_loss, take_profit: plan.take_profit, multiplier: plan.multiplier,
+    })
   } catch (e) {
     return await finish('failed', `Could not trade: ${(e as Error).message}`)
-  } finally {
-    session?.close()
+
   }
 }
