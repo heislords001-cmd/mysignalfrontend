@@ -1,7 +1,7 @@
 // Vercel function: saves (POST) or removes (DELETE) a member's Deriv API key. The key is encrypted before it is stored
 // and is never sent back to the browser.
 import { encrypt } from './_crypto.js'
-import { derivAuthorize } from './_deriv.js'
+import { verifyToken } from './_deriv-rest.js'
 
 interface Req { method?: string; headers: Record<string, string | undefined>; body?: { token?: string } }
 interface Res { status(c: number): Res; json(b: unknown): void }
@@ -40,14 +40,21 @@ async function run(req: Req, res: Res) {
   let blob: string
   try { blob = encrypt(apiKey) } catch { return res.status(500).json({ error: 'The server is missing its encryption key (TOKEN_ENCRYPTION_KEY).' }) }
 
-  const v = await derivAuthorize(apiKey, process.env.DERIV_APP_ID || '1089')
-  if (!v.ok && v.reason === 'invalid') return res.status(400).json({ error: 'Deriv says this token is not valid. Check it was copied fully, and that it has the Trade scope.' })
+  const v = await verifyToken(apiKey)
+  const vOk = v.ok
+  const vLoginid = v.ok ? v.data.loginid : null
+  const vCurrency = v.ok ? v.data.currency : null
+  if (!v.ok && v.code === 'no_app_id') return res.status(500).json({ error: 'DERIV_APP_ID is not set in Vercel. Add it as a Secret and redeploy.' })
+  if (!v.ok && v.code === 'not_demo') return res.status(400).json({ error: v.message })
+  if (!v.ok && (v.code === 'unreachable' || v.code === 'timeout')) {
+    // save the key but mark unverified — Deriv may be down
+  } else if (!v.ok) return res.status(400).json({ error: `Deriv rejected the token: ${v.message}` })
 
   const merge = { ...db, Prefer: 'resolution=merge-duplicates' }
   const s1 = await fetch(`${sb}/rest/v1/broker_secrets?on_conflict=user_id`, { method: 'POST', headers: merge, body: JSON.stringify({ user_id: user.id, broker: 'deriv', data: blob }) })
   const s2 = await fetch(`${sb}/rest/v1/broker_links?on_conflict=user_id`, {
     method: 'POST', headers: merge,
-    body: JSON.stringify({ user_id: user.id, broker: 'deriv', loginid: v.ok ? v.loginid : null, is_virtual: v.ok ? v.isVirtual : null, currency: v.ok ? v.currency : null, status: v.ok ? 'verified' : 'unverified', linked_at: new Date().toISOString() }),
+    body: JSON.stringify({ user_id: user.id, broker: 'deriv', loginid: vLoginid, is_virtual: vOk ? true : null, currency: vCurrency, status: vOk ? 'verified' : 'unverified', linked_at: new Date().toISOString() }),
   })
   if (!s1.ok || !s2.ok) {
     const bad = !s1.ok ? s1 : s2
@@ -55,5 +62,5 @@ async function run(req: Req, res: Res) {
     const noTable = /does not exist|PGRST205|42P01|schema cache/i.test(txt)
     return res.status(500).json({ error: noTable ? 'The database is missing a table. Run migration-2.sql in the Supabase SQL Editor.' : `The database refused the save (status ${bad.status}).` })
   }
-  return res.status(200).json({ ok: true, status: v.ok ? 'verified' : 'unverified', note: v.ok ? undefined : v.message })
+  return res.status(200).json({ ok: true, status: vOk ? 'verified' : 'unverified', note: vOk ? undefined : (v as any).message })
 }

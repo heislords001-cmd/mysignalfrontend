@@ -3,14 +3,9 @@ export type DerivResult =
   | { ok: true; loginid: string; isVirtual: boolean; currency: string }
   | { ok: false; reason: 'invalid' | 'unreachable'; message: string }
 
-// Deriv WebSocket helper. Uses native WebSocket (Node 22+) or falls back to the 'ws' package.
-let _WS: typeof WebSocket
-try {
-  // Native WebSocket is available in Node 22+
-  _WS = (globalThis as any).WebSocket ?? require('ws')
-} catch {
-  _WS = (globalThis as any).WebSocket
-}
+// Deriv WebSocket helper. Uses native WebSocket (Node 22+).
+// Node 22 ships a global WebSocket so no polyfill is needed.
+const _WS: typeof WebSocket = (globalThis as any).WebSocket
 
 export function derivAuthorize(token: string, appId: string, timeoutMs = 8000): Promise<DerivResult> {
   const WS = _WS

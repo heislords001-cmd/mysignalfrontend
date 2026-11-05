@@ -7,6 +7,7 @@
 import { decrypt } from './_crypto.js'
 import { dbHeaders, env } from './_auth.js'
 import { DerivSession, MAX_STAKE, MIN_STAKE, SYMBOLS, errText, planScalp, planTrade } from './_trade.js'
+import { placeMultiplier } from './_deriv-rest.js'
 import type { MarketState } from './_trade.js'
 
 export interface Signal { id: number; symbol: string; side: string; entry: number; sl: number; tp1: number; approved?: boolean; expires_at?: string | null }
