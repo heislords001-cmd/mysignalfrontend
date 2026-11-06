@@ -120,9 +120,14 @@ export async function placeMultiplier(o: MultiplierOrder): Promise<Result<{ cont
     amount: o.stake,
     basis: 'stake',
     multiplier: o.multiplier,
-    limit_order: { stop_loss: o.stopLoss, take_profit: o.takeProfit },
+    // stop_loss and take_profit are top-level fields in the bulk-purchase body, not inside contract_parameters
   }
-  const body = { contract_parameters: params, accounts: [{ token: o.token, account_id: o.accountId }] }
+  const body = {
+    contract_parameters: params,
+    stop_loss: o.stopLoss,
+    take_profit: o.takeProfit,
+    accounts: [{ token: o.token, account_id: o.accountId }],
+  }
   const r = await post<any>('/trading/v1/options/contracts/bulk-purchase/demo', o.token, body)
   if (!r.ok) return r
   const tx = r.data?.data?.transactions?.[0]
