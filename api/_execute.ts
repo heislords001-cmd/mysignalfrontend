@@ -147,7 +147,18 @@ async function placeForMember(userId: string, o: Order, secret: string, cfg: Row
       contract_id: trade.data.contractId, stake, stop_loss: plan.stop_loss, take_profit: plan.take_profit, multiplier: plan.multiplier,
     })
   } catch (e) {
-    return await finish('failed', `Could not trade: ${(e as Error).message}`)
-
+    const msg = `Could not trade: ${(e as Error).message ?? String(e)}`
+    try {
+      return await finish('failed', msg)
+    } catch {
+      // finish itself failed (e.g. the executions row doesn't exist yet)
+      // try a direct PATCH as a last resort
+      try {
+        const { sb } = env(), h = dbHeaders()
+        await fetch(`${sb}/rest/v1/executions?user_id=eq.${userId}&status=eq.pending&order=created_at.desc&limit=1`,
+          { method: 'PATCH', headers: h, body: JSON.stringify({ status: 'failed', message: msg.slice(0, 200) }) })
+      } catch { /* nothing left to do */ }
+      return 'failed'
+    }
   }
 }

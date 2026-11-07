@@ -46,7 +46,8 @@ async function get<T>(path: string, token: string): Promise<Result<T>> {
     const body = await r.json().catch(() => ({})) as any
     if (!r.ok) {
       const err = body?.errors?.[0] ?? {}
-      return { ok: false, code: err.code ?? 'api_error', message: err.message ?? r.statusText, status: r.status }
+      const bodyStr = JSON.stringify(body).slice(0, 300)
+      return { ok: false, code: err.code ?? 'api_error', message: `${err.message ?? r.statusText} | response: ${bodyStr}`, status: r.status }
     }
     return { ok: true, data: body as T }
   } catch (e: any) {
@@ -66,7 +67,8 @@ async function post<T>(path: string, token: string, body: unknown): Promise<Resu
     const resp = await r.json().catch(() => ({})) as any
     if (!r.ok) {
       const err = resp?.errors?.[0] ?? {}
-      return { ok: false, code: err.code ?? 'api_error', message: err.message ?? r.statusText, status: r.status }
+      const respStr = JSON.stringify(resp).slice(0, 300)
+      return { ok: false, code: err.code ?? 'api_error', message: `${err.message ?? r.statusText} | response: ${respStr}`, status: r.status }
     }
     return { ok: true, data: resp as T }
   } catch (e: any) {
