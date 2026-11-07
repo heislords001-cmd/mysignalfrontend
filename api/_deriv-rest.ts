@@ -115,25 +115,23 @@ export async function placeMultiplier(o: MultiplierOrder): Promise<Result<{ cont
   if (o.stake < 1 || o.stake > 10) return { ok: false, code: 'stake_out_of_range', message: `Stake $${o.stake} is outside the allowed range of $1 to $10.` }
   if (o.stopLoss > o.stake * 0.5) return { ok: false, code: 'stop_too_wide', message: `Stop loss $${o.stopLoss} exceeds half of the stake $${o.stake}.` }
 
-  const params = {
+  const buyBody = {
+    account_id: o.accountId,
     contract_type: o.side === 'buy' ? 'MULTUP' : 'MULTDOWN',
     underlying_symbol: o.symbol,
     currency: o.currency,
     amount: o.stake,
     basis: 'stake',
     multiplier: o.multiplier,
-    // stop_loss and take_profit are top-level fields in the bulk-purchase body, not inside contract_parameters
-  }
-  const body = {
-    contract_parameters: params,
     stop_loss: o.stopLoss,
     take_profit: o.takeProfit,
-    accounts: [{ token: o.token, account_id: o.accountId }],
   }
-  const r = await post<any>('/trading/v1/options/contracts/bulk-purchase/demo', o.token, body)
+  const r = await post<any>('/trading/v1/options/contracts', o.token, buyBody)
   if (!r.ok) return r
-  const tx = r.data?.data?.transactions?.[0]
-  if (!tx) return { ok: false, code: 'no_transaction', message: 'Deriv returned no transaction.' }
-  if (tx.error) return { ok: false, code: tx.error.code ?? 'trade_error', message: tx.error.message ?? 'Deriv rejected the trade.' }
-  return { ok: true, data: { contractId: tx.contract_id, buyPrice: tx.buy_price, transactionId: tx.transaction_id, accountId: tx.account_id } }
+  const raw = r.data as any
+  const contractId = raw?.data?.contract_id ?? raw?.data?.id ?? raw?.contract_id
+  const buyPrice = Number(raw?.data?.buy_price ?? raw?.data?.cost ?? raw?.buy_price ?? 0)
+  const transactionId = Number(raw?.data?.transaction_id ?? raw?.data?.id ?? raw?.transaction_id ?? 0)
+  if (!contractId) return { ok: false, code: 'no_contract', message: `No contract_id in response: ${JSON.stringify(raw).slice(0, 300)}` }
+  return { ok: true, data: { contractId: Number(contractId), buyPrice, transactionId, accountId: o.accountId } }
 }

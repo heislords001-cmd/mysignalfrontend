@@ -62,13 +62,13 @@ export function DerivLink({ uid, onLink }: { uid: string; onLink?: (l: BrokerLin
       <div className="row"><h3 style={{ margin: 0 }}>Deriv account</h3><span className={link.status === 'verified' ? 'ok' : 'mu'}>{link.status === 'verified' ? 'Connected' : 'Saved, not checked'}</span></div>
       <div className="row ml"><span className="mu">Account</span><b>{link.loginid ?? 'not read yet'}{link.is_virtual != null && <span className="tg">{link.is_virtual ? 'Demo' : 'Real'}</span>}</b></div>
       <p className="mu">Your key is saved encrypted on our server and is never shown again. When the bot is on, it places each approved signal as a trade on this account. Demo accounts only for now.</p>
-      {msg && <p className={bad ? 'err' : 'mu'}>{msg}</p>}
+      {msg && <p className={bad ? 'err' : 'mu'} style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', fontSize: 13 }}>{msg}</p>}
       <p className="row" style={{ justifyContent: 'flex-start', gap: 8, margin: 0 }}>
         <button className="btn sm brown" disabled={busy} onClick={sendTest}>Send a test trade</button>
         <button className="btn sm" disabled={busy} onClick={remove}>Remove key</button>
       </p>
       <p className="mu">The test places one small trade (your stake, 1 USD or more) on your Deriv demo account right now, with the same rules as a real signal. It shows plainly whether it was placed, skipped or failed.</p>
-      {test && <p className={test.startsWith('Placed') ? 'ok' : 'err'}>{test}</p>}
+      {test && <p className={test.startsWith('Placed') ? 'ok' : 'err'} style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', fontSize: 13 }}>{test}</p>}
     </div>
   )
   return (
@@ -82,7 +82,7 @@ export function DerivLink({ uid, onLink }: { uid: string; onLink?: (l: BrokerLin
         <li>Copy the token and paste it here.</li>
       </ol>
       <label className="f">Deriv API key<input type="password" value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" required /></label>
-      {msg && <p className={bad ? 'err' : 'mu'}>{msg}</p>}
+      {msg && <p className={bad ? 'err' : 'mu'} style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', fontSize: 13 }}>{msg}</p>}
       <p style={{ marginBottom: 0 }}><button className="btn brown" type="submit" disabled={busy}>{busy ? 'Saving...' : 'Save key'}</button></p>
     </form>
   )
