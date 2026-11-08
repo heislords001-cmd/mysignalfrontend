@@ -110,28 +110,62 @@ export interface MultiplierOrder {
 }
 
 /** Place one multiplier trade on a demo account */
+
+export async function getOtp(token: string, accountId: string): Promise<Result<OtpResponse>> {
+  return post<OtpResponse>(`/trading/v1/options/accounts/${accountId}/otp`, token, {})
+}
+
+
+export async function buyViaWebSocket(o: MultiplierOrder, otp: string): Promise<Result<{ contractId: number; buyPrice: number; transactionId: number; accountId: string }>> {
+  const wsUrl = `wss://api.derivws.com/trading/v1/options/ws/demo?otp=${encodeURIComponent(otp)}`
+  return new Promise((resolve) => {
+    const WS = (globalThis as any).WebSocket
+    if (!WS) return resolve({ ok: false, code: 'no_ws', message: 'WebSocket not available on this server.' })
+    let done = false
+    let reqId = 0
+    const finish = (r: Result<any>) => { if (!done) { done = true; clearTimeout(timer); try { ws.close() } catch {} resolve(r) } }
+    const timer = setTimeout(() => finish({ ok: false, code: 'timeout', message: 'Deriv WebSocket timed out.' }), 15000)
+    const ws = new WS(wsUrl)
+    ws.onerror = () => finish({ ok: false, code: 'ws_error', message: 'Could not connect to Deriv WebSocket.' })
+    ws.onopen = () => {
+      reqId = Date.now()
+      ws.send(JSON.stringify({
+        buy: '1', price: o.stake, req_id: reqId,
+        parameters: {
+          contract_type: o.side === 'buy' ? 'MULTUP' : 'MULTDOWN',
+          underlying_symbol: o.symbol,
+          currency: o.currency,
+          amount: o.stake,
+          basis: 'stake',
+          multiplier: o.multiplier,
+          limit_order: { stop_loss: o.stopLoss, take_profit: o.takeProfit },
+        },
+      }))
+    }
+    ws.onmessage = (ev: { data: string }) => {
+      let m: any
+      try { m = JSON.parse(ev.data) } catch { return }
+      if (m.msg_type !== 'buy') return
+      if (m.error) return finish({ ok: false, code: m.error.code ?? 'buy_error', message: m.error.message ?? 'Deriv rejected the trade.' })
+      const b = m.buy
+      if (!b?.contract_id) return finish({ ok: false, code: 'no_contract', message: `No contract_id: ${JSON.stringify(b).slice(0, 200)}` })
+      finish({ ok: true, data: { contractId: Number(b.contract_id), buyPrice: Number(b.buy_price ?? 0), transactionId: Number(b.transaction_id ?? 0), accountId: o.accountId } })
+    }
+  })
+}
+
 export async function placeMultiplier(o: MultiplierOrder): Promise<Result<{ contractId: number; buyPrice: number; transactionId: number; accountId: string }>> {
   if (!appId()) return { ok: false, code: 'no_app_id', message: 'DERIV_APP_ID is not set in Vercel settings.' }
   if (o.stake < 1 || o.stake > 10) return { ok: false, code: 'stake_out_of_range', message: `Stake $${o.stake} is outside the allowed range of $1 to $10.` }
   if (o.stopLoss > o.stake * 0.5) return { ok: false, code: 'stop_too_wide', message: `Stop loss $${o.stopLoss} exceeds half of the stake $${o.stake}.` }
-
-  const buyBody = {
-    account_id: o.accountId,
-    contract_type: o.side === 'buy' ? 'MULTUP' : 'MULTDOWN',
-    underlying_symbol: o.symbol,
-    currency: o.currency,
-    amount: o.stake,
-    basis: 'stake',
-    multiplier: o.multiplier,
-    stop_loss: o.stopLoss,
-    take_profit: o.takeProfit,
-  }
-  const r = await post<any>('/trading/v1/options/contracts', o.token, buyBody)
-  if (!r.ok) return r
-  const raw = r.data as any
-  const contractId = raw?.data?.contract_id ?? raw?.data?.id ?? raw?.contract_id
-  const buyPrice = Number(raw?.data?.buy_price ?? raw?.data?.cost ?? raw?.buy_price ?? 0)
-  const transactionId = Number(raw?.data?.transaction_id ?? raw?.data?.id ?? raw?.transaction_id ?? 0)
-  if (!contractId) return { ok: false, code: 'no_contract', message: `No contract_id in response: ${JSON.stringify(raw).slice(0, 300)}` }
-  return { ok: true, data: { contractId: Number(contractId), buyPrice, transactionId, accountId: o.accountId } }
+  // Step 1: get a one-time password to open a WebSocket
+  const otpResult = await getOtp(o.token, o.accountId)
+  if (!otpResult.ok) return { ok: false, code: otpResult.code, message: `Could not get OTP: ${otpResult.message}` }
+  const otp = (otpResult.data as any)?.otp ?? (otpResult.data as any)?.data?.otp
+  if (!otp) return { ok: false, code: 'no_otp', message: `OTP not in response: ${JSON.stringify(otpResult.data).slice(0, 200)}` }
+  // Step 2: connect to the demo WebSocket and buy
+  return buyViaWebSocket(o, otp)
 }
+
+export interface OtpResponse { otp: string; ws_url?: string }
+

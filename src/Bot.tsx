@@ -121,12 +121,12 @@ export function TradeSettings({ uid, admin }: { uid: string; admin: boolean }) {
     <form className="card" onSubmit={save}>
       <h3>Signal trading</h3>
       <p className="mu">The bot follows the scanner's approved signals and holds each trade until its take profit or stop loss.</p>
-      <div className="form">{num('stake_usd', 'Stake per trade (USD, 1 to 10)', 1, 10)}{num('max_open', 'Most signal trades open at once', 1, 10)}{num('daily_max', 'Most signal trades per day', 1, 50)}</div>
+      <div className="form" style={{ width: "100%" }}>{num('stake_usd', 'Stake per trade (USD, 1 to 10)', 1, 10)}{num('max_open', 'Most signal trades open at once', 1, 10)}{num('daily_max', 'Most signal trades per day', 1, 50)}</div>
       {admin && <div className="sw"><span>Also trade untested signals<div className="mu">Your own demo account only</div></span><input type="checkbox" checked={v.trade_untested} onChange={(e) => setV({ ...v, trade_untested: e.target.checked })} /></div>}
       <h3 className="ml">Scalp mode</h3>
       <div className="sw"><span>Scalp mode<div className="mu">Small, quick trades the bot finds itself</div></span><input type="checkbox" aria-label="Scalp mode" checked={v.scalp_enabled} onChange={(e) => setV({ ...v, scalp_enabled: e.target.checked })} /></div>
       <p className="mu">The bot reads the market on its own. While the bigger trend is confirmed, it opens small trades with a tiny take profit and a stop loss. Deriv closes each one when it hits its target, and the bot opens another. It checks about every 5 minutes, so this is not high-speed scalping. Deriv charges fees on these trades, which can eat tiny profits, so watch the results on a demo account first.</p>
-      {v.scalp_enabled && <div className="form">{num('scalp_stake_usd', 'Stake per scalp (USD, 1 to 10)', 1, 10)}{num('scalp_max_per_pair', 'Most scalps per pair', 1, 5)}{num('scalp_max_open', 'Most scalps open at once', 1, 20)}{num('scalp_daily_max', 'Most scalps per day', 1, 100)}</div>}
+      {v.scalp_enabled && <div className="form" style={{ width: "100%" }}>{num('scalp_stake_usd', 'Stake per scalp (USD, 1 to 10)', 1, 10)}{num('scalp_max_per_pair', 'Most scalps per pair', 1, 5)}{num('scalp_max_open', 'Most scalps open at once', 1, 20)}{num('scalp_daily_max', 'Most scalps per day', 1, 100)}</div>}
       <p className="mu">Every trade gets a stop loss that can lose at most half of its stake.</p>
       <p className="row"><span className={msg.startsWith('Saved') ? 'mu' : 'err'}>{msg}</span><button className="btn p" type="submit">Save</button></p>
     </form>
