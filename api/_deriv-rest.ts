@@ -161,8 +161,11 @@ export async function placeMultiplier(o: MultiplierOrder): Promise<Result<{ cont
   // Step 1: get a one-time password to open a WebSocket
   const otpResult = await getOtp(o.token, o.accountId)
   if (!otpResult.ok) return { ok: false, code: otpResult.code, message: `Could not get OTP: ${otpResult.message}` }
-  const otp = (otpResult.data as any)?.otp ?? (otpResult.data as any)?.data?.otp
-  if (!otp) return { ok: false, code: 'no_otp', message: `OTP not in response: ${JSON.stringify(otpResult.data).slice(0, 200)}` }
+  // The OTP response contains the full WebSocket URL in data.url or data.data.url
+  const raw = otpResult.data as any
+  const wsUrl = raw?.data?.url ?? raw?.url
+  const otp = wsUrl ? new URL(wsUrl).searchParams.get('otp') : (raw?.otp ?? raw?.data?.otp)
+  if (!otp) return { ok: false, code: 'no_otp', message: `OTP not in response: ${JSON.stringify(raw).slice(0, 200)}` }
   // Step 2: connect to the demo WebSocket and buy
   return buyViaWebSocket(o, otp)
 }
