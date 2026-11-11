@@ -12,6 +12,116 @@ const Bar = ({ label, text, v, max }: { label: string; text: string; v: number; 
   return <><div className="row"><span>{label}</span><span className="mu">{text}</span></div><div className={`pg ${pct >= 80 ? 'hot' : ''}`}><span style={{ width: `${pct}%` }} /></div></>
 }
 
+
+
+export function EquityChart({ uid }: { uid: string }) {
+  const [points, setPoints] = useState<{ t: string; v: number }[]>([])
+  const [acct, setAcct] = useState<{ balance: number; equity: number; floating: number } | null>(null)
+
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase.from('executions')
+        .select('profit, closed_at, created_at')
+        .eq('user_id', uid).eq('status', 'bought')
+        .order('created_at', { ascending: true }).limit(200)
+      if (!data?.length) return
+      let running = 0
+      const pts = data.map((r: any) => {
+        running += Number(r.profit ?? 0)
+        return { t: r.closed_at ?? r.created_at, v: Math.round(running * 100) / 100 }
+      })
+      setPoints(pts)
+    }
+    load()
+    const t = setInterval(load, 30000)
+    return () => clearInterval(t)
+  }, [uid])
+
+  if (!points.length) return null
+
+  const W = 300, H = 100, PAD = 8
+  const vals = points.map((p) => p.v)
+  const min = Math.min(...vals, 0), max = Math.max(...vals, 0.01)
+  const range = max - min || 1
+  const toX = (i: number) => PAD + (i / (points.length - 1)) * (W - PAD * 2)
+  const toY = (v: number) => H - PAD - ((v - min) / range) * (H - PAD * 2)
+  const pts = points.map((p, i) => `${toX(i).toFixed(1)},${toY(p.v).toFixed(1)}`).join(' ')
+  const last = vals[vals.length - 1]
+  const color = last >= 0 ? 'var(--buy)' : 'var(--sell)'
+  const zero = toY(0)
+
+  return (
+    <div className="card">
+      <div className="row"><h3 style={{ margin: 0 }}>Live analysis</h3><span className={last >= 0 ? 'ok' : 'neg'}>{last >= 0 ? '+' : ''}{usd(last)}</span></div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block', margin: '8px 0' }}>
+        <defs>
+          <linearGradient id="eqgrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.25" />
+            <stop offset="100%" stopColor={color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {/* zero line */}
+        <line x1={PAD} y1={zero} x2={W - PAD} y2={zero} stroke="var(--ln)" strokeWidth="0.5" strokeDasharray="3,3" />
+        {/* fill under the line */}
+        <polygon points={`${toX(0)},${zero} ${pts} ${toX(points.length - 1)},${zero}`} fill="url(#eqgrad)" />
+        {/* the equity line */}
+        <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        {/* current value dot */}
+        <circle cx={toX(points.length - 1)} cy={toY(last)} r="3" fill={color} />
+      </svg>
+      <div className="stats c3 ml">
+        <div className="stat"><span className="mu">Detecting market</span><span className="ok">●</span></div>
+        <div className="stat"><span className="mu">Calibrating SL</span><span className="ok">●</span></div>
+        <div className="stat"><span className="mu">AI scoring</span><span className="ok">●</span></div>
+      </div>
+      <p className="mu">Bot is monitoring your demo account.</p>
+    </div>
+  )
+}
+
+export function ExnessLink({ uid, onLink }: { uid: string; onLink?: (linked: boolean) => void }) {
+  const [link, setLink] = useState<{ loginid: string; is_virtual: boolean; currency: string } | null | undefined>(undefined)
+  const [msg, setMsg] = useState(''); const [bad, setBad] = useState(false); const [busy, setBusy] = useState(false)
+  const load = useCallback(() => {
+    supabase.from('broker_links').select('loginid,is_virtual,currency').eq('user_id', uid).eq('broker', 'exness').maybeSingle()
+      .then(({ data }) => { setLink((data as any) ?? null); onLink?.(!!data) })
+  }, [uid, onLink])
+  useEffect(() => { load() }, [load])
+  const call = async (method: 'POST' | 'DELETE') => {
+    const { data } = await supabase.auth.getSession()
+    const res = await fetch('/api/exness-link', { method, headers: { Authorization: `Bearer ${data.session?.access_token ?? ''}` } })
+    return { ok: res.ok, out: (await res.json().catch(() => ({}))) as { error?: string; loginid?: string; currency?: string; isDemo?: boolean } }
+  }
+  const connect = async () => {
+    setBusy(true); setMsg('')
+    const { ok, out } = await call('POST')
+    setBusy(false); setBad(!ok)
+    if (ok) { setMsg(`Connected: ${out.loginid} ${out.isDemo ? '(Demo)' : '(Live)'}`); load() } else setMsg(out.error ?? 'Could not connect.')
+  }
+  const remove = async () => { setBusy(true); await call('DELETE'); setBusy(false); setMsg('Disconnected.'); setBad(false); setLink(null); onLink?.(false) }
+  if (link === undefined) return null
+  if (link) return (
+    <div className="card">
+      <div className="row"><h3 style={{ margin: 0 }}>Exness MT5 account</h3><span className="ok">Connected</span></div>
+      <div className="row ml"><span className="mu">Account</span><b>{link.loginid}<span className="tg">{link.is_virtual ? 'Demo' : 'Live'}</span></b></div>
+      <p className="mu">Your Exness API credentials are stored encrypted on the server. Demo accounts only for now.</p>
+      {msg && <p className={bad ? 'err' : 'mu'} style={{ wordBreak: 'break-word' }}>{msg}</p>}
+      <button className="btn sm" disabled={busy} onClick={remove}>Disconnect</button>
+    </div>
+  )
+  return (
+    <div className="card">
+      <h3>Connect Exness account</h3>
+      <p className="mu">Your Exness API credentials must be added to Vercel as Secrets first. Add these five settings in Vercel, then press Connect:</p>
+      <div className="mu" style={{ background: 'var(--rs)', padding: '10px 12px', borderRadius: 8, fontFamily: 'var(--mono)', fontSize: 12, marginBottom: 12 }}>
+        EXN_API_KEY<br/>EXN_PRIVATE_KEY<br/>EXN_ACCOUNT_ID<br/>EXN_DISCOVERY_BASE_URL
+      </div>
+      {msg && <p className={bad ? 'err' : 'mu'} style={{ wordBreak: 'break-word' }}>{msg}</p>}
+      <button className="btn brown" disabled={busy} onClick={connect}>{busy ? 'Connecting...' : 'Connect Exness account'}</button>
+    </div>
+  )
+}
+
 export function DerivLink({ uid, onLink }: { uid: string; onLink?: (l: BrokerLink | null) => void }) {
   const [link, setLink] = useState<BrokerLink | null | undefined>(undefined)
   const [key, setKey] = useState('')
@@ -265,6 +375,7 @@ export default function Bot({ uid, admin = false, botAccess, goPlan }: { uid: st
   return (
     <>
       <DerivLink uid={uid} onLink={setLinked} />
+      <ExnessLink uid={uid} />
       <div className="card">
         <div className="row">
           <div>
@@ -285,6 +396,7 @@ export default function Bot({ uid, admin = false, botAccess, goPlan }: { uid: st
         )}
       </div>
       {linked && <TradeSettings uid={uid} admin={admin} />}
+      {linked && <EquityChart uid={uid} />}
       {linked && <ResultsCard uid={uid} />}
       {linked && <ExecList uid={uid} />}
       {mt5 && <>
