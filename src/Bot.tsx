@@ -67,82 +67,6 @@ export function EquityChart({ uid }: { uid: string }) {
   )
 }
 
-export function ChartRead({ uid }: { uid: string }) {
-  const [on, setOn] = useState<boolean | undefined>(undefined)
-  const [file, setFile] = useState<File | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [msg, setMsg] = useState('')
-  const [out, setOut] = useState<any>(null)
-
-  useEffect(() => {
-    supabase.from('user_settings').select('data').eq('user_id', uid).maybeSingle().then(({ data }) => {
-      setOn(((data?.data ?? {}) as Record<string, unknown>).chart_read_on === true)
-    })
-  }, [uid])
-
-  const toggle = async (v: boolean) => {
-    setOn(v); setMsg(''); setOut(null)
-    const { data } = await supabase.from('user_settings').select('data').eq('user_id', uid).maybeSingle()
-    const merged = { ...((data?.data ?? {}) as object), chart_read_on: v }
-    await supabase.from('user_settings').upsert({ user_id: uid, data: merged }, { onConflict: 'user_id' })
-  }
-
-  const read = async (e: FormEvent) => {
-    e.preventDefault()
-    if (!file) return setMsg('Choose a screenshot first.')
-    if (file.size > 2 * 1024 * 1024) return setMsg('Screenshot is over 2 MB. Crop it or take a smaller one.')
-    setBusy(true); setMsg(''); setOut(null)
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const fr = new FileReader(); fr.onload = () => resolve(String(fr.result)); fr.onerror = () => reject(new Error('Could not read the file.')); fr.readAsDataURL(file)
-    }).catch((err) => { setMsg(err.message); return '' })
-    if (!dataUrl) { setBusy(false); return }
-    const { data } = await supabase.auth.getSession()
-    const res = await fetch('/api/chart-read', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token ?? ''}` },
-      body: JSON.stringify({ image: dataUrl }),
-    })
-    const j = (await res.json().catch(() => ({}))) as any
-    setBusy(false)
-    if (!res.ok) return setMsg(j.error ?? `The chart read failed (status ${res.status}).`)
-    setOut(j)
-  }
-
-  if (on === undefined) return null
-  return (
-    <div className="card">
-      <div className="row"><h3 style={{ margin: 0 }}>Chart reading</h3>
-        <label className="sw" style={{ margin: 0 }}><input type="checkbox" checked={on} onChange={(e) => toggle(e.target.checked)} /></label></div>
-      {!on && <p className="mu">Optional. Switch on to upload a chart screenshot and get a written read of it. Off by default. It never places a trade.</p>}
-      {on && (
-        <>
-          <p className="mu">Upload a screenshot and get a written read: trend, pattern and what would change it. This is an opinion from a picture. It is not a signal and never trades. Up to 10 reads a day.</p>
-          <form onSubmit={read}>
-            <label className="f" style={{ marginTop: 10 }}>Screenshot (PNG, JPEG or WEBP, up to 2 MB)
-              <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-            </label>
-            <p style={{ marginBottom: 0, marginTop: 10 }}><button className="btn brown" type="submit" disabled={busy || !file}>{busy ? 'Reading the chart...' : 'Read this chart'}</button></p>
-          </form>
-          {msg && <p className="err" style={{ wordBreak: 'break-word' }}>{msg}</p>}
-          {out && (
-            <div className="ml">
-              <div className="row"><b>{out.symbol} · {out.timeframe}</b><span className="tg">Bias: {out.read.bias}</span></div>
-              <p className="mu"><b>Structure.</b> {out.read.structure}</p>
-              <p className="mu"><b>Pattern.</b> {out.read.pattern}</p>
-              <p className="mu"><b>Price areas seen.</b> {out.read.observed_levels}</p>
-              <p className="mu"><b>What would change it.</b> {out.read.what_would_change_it}</p>
-              <p className="mu"><b>Confidence.</b> {Math.round((out.read.confidence ?? 0) * 100)}%</p>
-              <p className="mu"><b>Can't tell from a screenshot.</b> {out.read.caveats}</p>
-              <p className="mu"><b>Our data.</b> {out.reference}</p>
-              <p className="mu" style={{ fontSize: 12 }}>{out.disclaimer}</p>
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  )
-}
-
 export function ExnessLink({ uid, onLink }: { uid: string; onLink?: (linked: boolean) => void }) {
   const [link, setLink] = useState<{ loginid: string; is_virtual: boolean; currency: string } | null | undefined>(undefined)
   const [msg, setMsg] = useState(''); const [bad, setBad] = useState(false); const [busy, setBusy] = useState(false)
@@ -395,6 +319,7 @@ export default function Bot({ uid, admin = false, botAccess, goPlan }: { uid: st
   const [confirm, setConfirm] = useState(false)
   const [err, setErr] = useState('')
   const [info, setInfo] = useState('')
+  const [sec, setSec] = useState<'control' | 'settings' | 'trades'>('control')
 
   const load = useCallback(async () => {
     const [s, a, p] = await Promise.all([
@@ -438,9 +363,15 @@ export default function Bot({ uid, admin = false, botAccess, goPlan }: { uid: st
   const floating = acct?.floating ?? 0
   return (
     <>
-      <DerivLink uid={uid} onLink={setLinked} />
-      <ExnessLink uid={uid} />
-      <ChartRead uid={uid} />
+      <div className="seg">
+        {[['control', 'Control'], ['settings', 'Settings'], ['trades', 'Trades']].map(([k, l]) => (
+          <button key={k} className={sec === k ? 'on' : ''} onClick={() => setSec(k as any)}>{l}</button>
+        ))}
+      </div>
+
+      {sec === 'control' && <>
+        <DerivLink uid={uid} onLink={setLinked} />
+        <ExnessLink uid={uid} />
       <div className="card">
         <div className="row">
           <div>
@@ -460,9 +391,7 @@ export default function Bot({ uid, admin = false, botAccess, goPlan }: { uid: st
               <button className="btn sm stop" onClick={kill}>Close everything</button></p></div>
         )}
       </div>
-      {linked && <TradeSettings uid={uid} admin={admin} />}
       {linked && <ResultsCard uid={uid} />}
-      {linked && <ExecList uid={uid} />}
       {mt5 && <>
         <div className="stats c2">
           <div className="stat"><span className="mu">Balance</span><b>${(acct?.balance ?? 0).toFixed(2)}</b></div>
@@ -487,6 +416,17 @@ export default function Bot({ uid, admin = false, botAccess, goPlan }: { uid: st
           ))}
         </div>
       </>}
+      </>}
+
+      {sec === 'settings' && linked && <>
+      {linked && <TradeSettings uid={uid} admin={admin} />}
+      </>}
+      {sec === 'settings' && !linked && <p className="mu">Connect an account in Control first.</p>}
+
+      {sec === 'trades' && linked && <>
+      {linked && <ExecList uid={uid} />}
+      </>}
+      {sec === 'trades' && !linked && <p className="mu">Connect an account in Control first.</p>}
     </>
   )
 }

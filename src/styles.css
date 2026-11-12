@@ -71,3 +71,39 @@ input[type=text],input[type=number],input[type=email],input[type=password]{backg
 @media (prefers-reduced-motion: reduce) { .eq-line, .eq-fill, .eq-dot { animation: none; stroke-dashoffset: 0; opacity: 1; transform: none; } }
 /* Start scanner is red */
 .btn.start { background: var(--sell-solid); border-color: var(--sell-solid); color: #fff; }
+
+/* ---- segmented control (Bot tab sections) ---- */
+.seg { display:flex; background:var(--sf); border:1px solid var(--ln); border-radius:12px; padding:4px; gap:4px; }
+.seg button { flex:1; background:transparent; border:0; color:var(--mu); padding:9px 6px; border-radius:9px; font-size:13px; cursor:pointer; }
+.seg button.on { background:var(--rs); color:var(--tx); border:1px solid var(--ln); }
+
+/* ---- chart tab ---- */
+.chart-tab { display:flex; flex-direction:column; gap:12px; }
+.drop-card { padding:18px; }
+.drop-empty { display:flex; flex-direction:column; align-items:center; text-align:center; gap:8px; padding:18px 6px; border:1px dashed var(--ln); border-radius:14px; }
+.drop-icon { width:56px; height:56px; border-radius:16px; background:var(--brown-bg); color:var(--brown); display:grid; place-items:center; }
+.drop-icon svg { width:26px; height:26px; }
+.drop-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin-top:10px; }
+.preview { width:100%; max-height:320px; object-fit:contain; border-radius:12px; background:#000; border:1px solid var(--ln); }
+.meter { height:6px; background:var(--rs); border-radius:6px; overflow:hidden; margin:10px 0 4px; }
+.meter span { display:block; height:100%; background:var(--brown); border-radius:6px; }
+.chip { font-size:11px; font-weight:600; padding:4px 9px; border-radius:999px; border:1px solid var(--ln); text-transform:capitalize; }
+.chip.ok { color:var(--buy); border-color:var(--buy); }
+.chip.neg { color:var(--sell); border-color:var(--sell); }
+.chip.mu { color:var(--mu); }
+.read-card .block { border-top:1px solid var(--ln); padding:10px 0; font-size:14px; line-height:1.5; }
+.read-card .block .label { margin-bottom:4px; }
+.read-card.compact { padding:12px; }
+.disclaimer { margin-top:10px; font-size:11px; color:var(--mu); }
+.hist { border-top:1px solid var(--ln); padding:12px 0; cursor:pointer; }
+.hist:first-of-type { border-top:0; }
+.label { font-size:11px; color:var(--mu); text-transform:uppercase; letter-spacing:.04em; }
+
+/* signal levels: each in its own pill */
+.pills { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.pill { display:flex; flex-direction:column; align-items:center; justify-content:center; min-width:104px; padding:8px 14px; border-radius:999px; border:1.5px solid; background:transparent; }
+.pill .pl { font-size:10px; letter-spacing:.06em; opacity:.8; }
+.pill .pv { font-family:var(--mono); font-size:14px; font-weight:600; }
+.pill.entry { border-color:#4d8dff; color:#4d8dff; }
+.pill.sl { border-color:#ee5a5f; color:#ee5a5f; }
+.pill.tp { border-color:#2fbf71; color:#2fbf71; }

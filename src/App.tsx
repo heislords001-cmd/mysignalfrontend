@@ -1,3 +1,4 @@
+import ChartTab from './ChartTab'
 import { useCallback, useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { configured, supabase } from './supabase'
@@ -11,7 +12,7 @@ import { Brand, Icon, ThemeToggle } from './ui'
 import type { IconName } from './ui'
 import type { Profile as P, Sub } from './types'
 
-type Tab = 'home' | 'sig' | 'bot' | 'pro'
+type Tab = 'home' | 'sig' | 'chart' | 'bot' | 'pro'
 
 function Shell({ session }: { session: Session }) {
   const [profile, setProfile] = useState<P | null>(null)
@@ -32,13 +33,14 @@ function Shell({ session }: { session: Session }) {
   const active = !!sub && new Date(sub.expires_at) > new Date()
   const access = admin || active
   const botAccess = admin || (active && sub?.plan === 'auto')
-  const tabs: [Tab, IconName, string][] = [['home', 'home', 'Home'], ['sig', 'bars', 'Signals'], ['bot', 'bot', 'Bot'], ['pro', 'user', 'Profile']]
+  const tabs: [Tab, IconName, string][] = [['home', 'home', 'Home'], ['sig', 'bars', 'Signals'], ['chart', 'camera', 'Chart'], ['bot', 'bot', 'Bot'], ['pro', 'user', 'Profile']]
   return (
     <>
       <div className="app">
         <div className="bar"><Brand /><div className="row" style={{ gap: 8 }}><ThemeToggle /><button className="btn sm" onClick={() => supabase.auth.signOut()}><Icon n="out" />Sign out</button></div></div>
         {tab === 'home' && <Home uid={profile.id} admin={admin} access={access} goPlan={() => setTab('pro')} />}
         {tab === 'sig' && <Signals access={access} goPlan={() => setTab('pro')} />}
+        {tab === 'chart' && <ChartTab uid={profile.id} />}
         {tab === 'bot' && <Bot uid={profile.id} admin={admin} botAccess={botAccess} goPlan={() => setTab('pro')} />}
         {tab === 'pro' && <Profile profile={profile} sub={sub} botAccess={botAccess} refresh={refresh} />}
       </div>

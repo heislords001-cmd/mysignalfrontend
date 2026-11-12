@@ -3,6 +3,7 @@
 // Trade levels come only from our own market data (market_state), shown next to the read for reference.
 // The image is used for the one request and is NOT stored. Only the text read is saved.
 import { dbHeaders, env, userFromJwt } from '../_auth.js'
+import { aiModel } from '../_ai.js'
 
 interface Req { method?: string; headers: Record<string, string | undefined>; body?: { image?: string } }
 interface Res { status(c: number): Res; json(b: unknown): void }
@@ -12,7 +13,7 @@ const PAIRS = ['EURUSD', 'USDJPY', 'USDCAD', 'USDCHF', 'AUDUSD', 'XAUUSD']
 const TIMEFRAMES = ['M5', 'M15', 'H1', 'H4', 'D1']
 const MAX_BYTES = 2 * 1024 * 1024
 const DAILY_LIMIT = 10
-const MODEL = process.env.NVIDIA_VISION_MODEL || 'mistralai/mistral-medium-3.5-128b'
+const MODEL = (process.env.NVIDIA_VISION_MODEL ?? '').trim() || aiModel()   // NVIDIA_MODEL drives every call; NVIDIA_VISION_MODEL overrides only the chart reader
 
 // Checks the real file type from its first bytes, not just the text the browser sends
 function imageKind(bytes: Buffer): 'png' | 'jpeg' | 'webp' | null {
@@ -22,12 +23,11 @@ function imageKind(bytes: Buffer): 'png' | 'jpeg' | 'webp' | null {
   return null
 }
 
-const PROMPT = () => `You are reading a trading chart screenshot for educational analysis.
-Describe ONLY what is visible. Do NOT give entry, stop loss or take profit prices. Do not promise outcomes.
-Read the pair and timeframe from the chart labels. Use the ones you see, not guesses.
+const PROMPT = () => `Describe this trading chart screenshot. Report only what is visible on it. No opinions, no advice, no predictions, no entry, stop loss or take profit prices.
+Read the pair and timeframe from the chart labels. Use "unknown" if they are not shown.
 
 Return ONLY this JSON object, no other text:
-{"symbol":"pair from the chart, like EURUSD, or unknown","timeframe":"like H1, or unknown","bias":"bullish"|"bearish"|"neutral"|"unclear","structure":"one or two sentences on the trend and recent swings","pattern":"what setup, if any, is visible, or 'none clear'","observed_levels":"notable price areas you can see, described in words, or 'not readable'","what_would_change_it":"what price action would invalidate this read","confidence":0.0-1.0,"caveats":"what you cannot tell from a screenshot"}`
+{"symbol":"pair shown, like EURUSD, or unknown","timeframe":"like H1, or unknown","visible_trend":"up" or "down" or "sideways" or "unclear","candles":"what the last visible candles do, in plain words","swing_points":"the visible highs and lows and where they are, in plain words","visible_levels":"horizontal price areas visible on the chart, in plain words","possible_setup":"buy" or "sell" or "none","setup_condition":"the visible condition that makes it a possible buy or sell, or 'none'","not_visible":"what this chart does not show"}` + ""
 
 export default async function handler(req: Req, res: Res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only.' })
@@ -79,22 +79,36 @@ export default async function handler(req: Req, res: Res) {
     const start = text.indexOf('{'), end = text.lastIndexOf('}') + 1
     let read: Record<string, unknown>
     try { read = JSON.parse(text.slice(start, end)) } catch { return res.status(502).json({ error: 'The chart reader answered in an unexpected format. Nothing was saved. Try again.' }) }
-    read.confidence = Math.max(0, Math.min(1, Number(read.confidence) || 0))
     const symbol = PAIRS.includes(String(read.symbol ?? '').toUpperCase()) ? String(read.symbol).toUpperCase() : 'unknown'
     const timeframe = TIMEFRAMES.includes(String(read.timeframe ?? '').toUpperCase()) ? String(read.timeframe).toUpperCase() : null
 
     // our own numbers for the pair the model read off the chart, for reference only
-    let ref = 'Pair not recognised on the chart, so no live reference is shown.'
+    let ref = 'Pair not recognised on the chart, so no live data is shown.'
+    let setup: Record<string, unknown> | null = null
     if (symbol !== 'unknown') {
       const mk = (await (await fetch(`${sb}/rest/v1/market_state?symbol=eq.${symbol}&select=trend,price,ema50,atr,updated_at`, { headers: h })).json()) as Record<string, unknown>[]
-      ref = mk[0]
-        ? `${symbol} last price ${mk[0].price}, EMA50 ${mk[0].ema50}, ATR ${mk[0].atr}, trend ${mk[0].trend} (as of ${mk[0].updated_at}).`
-        : `No live market reading for ${symbol} is available right now.`
+      const row = mk[0]
+      ref = row ? `${symbol} last price ${row.price}, EMA50 ${row.ema50}, ATR ${row.atr} (as of ${row.updated_at}).` : `No live market data for ${symbol} is available right now.`
+      const side = String(read.possible_setup ?? '').toLowerCase()
+      const p = Number(row?.price), a = Number(row?.atr)
+      if (row && (side === 'buy' || side === 'sell') && p > 0 && a > 0) {
+        // levels come from OUR live price and ATR, never from the picture. Stop 1.5 ATR, targets at 1.5R and 3R.
+        const d = side === 'buy' ? 1 : -1
+        const risk = 1.5 * a
+        setup = {
+          side,
+          entry: Number(p.toFixed(5)),
+          stop_loss: Number((p - d * risk).toFixed(5)),
+          take_profit_1: Number((p + d * 1.5 * risk).toFixed(5)),
+          take_profit_2: Number((p + d * 3 * risk).toFixed(5)),
+          basis: 'Calculated from our live price and ATR, not read from the picture. Untested. Not a signal.',
+        }
+      }
     }
 
     // save the text read only, never the image
     await fetch(`${sb}/rest/v1/chart_reads`, { method: 'POST', headers: h, body: JSON.stringify({ user_id: user.id, symbol, timeframe: timeframe ?? '?', read }) })
-    return res.status(200).json({ ok: true, symbol, timeframe: timeframe ?? '?', reference: ref, read, disclaimer: 'An opinion from a screenshot. Not a signal, not a trade, and not tested. Trade levels come only from our scanner.' })
+    return res.status(200).json({ ok: true, symbol, timeframe: timeframe ?? '?', reference: ref, read, setup, disclaimer: 'Describes what is on the chart. A possible setup is not a signal and has not been tested.' })
   } catch (e) {
     return res.status(500).json({ error: `The server hit an error: ${(e as Error).message}` })
   }

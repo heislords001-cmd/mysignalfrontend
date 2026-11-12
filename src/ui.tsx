@@ -2,8 +2,9 @@ import type { ReactNode } from 'react'
 import type { Signal } from './types'
 import { useTheme } from './theme'
 
-export type IconName = 'logo' | 'home' | 'bars' | 'bot' | 'user' | 'play' | 'stop' | 'out' | 'lock' | 'sun' | 'moon'
+export type IconName = 'logo' | 'home' | 'bars' | 'bot' | 'user' | 'play' | 'stop' | 'out' | 'lock' | 'sun' | 'moon' | 'camera'
 const P: Record<IconName, ReactNode> = {
+  camera: <><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></>,
   logo: <path d="M3 17l5-6 4 3 8-9M15 5h5v5" />, home: <path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z" />, bars: <path d="M5 20V10M12 20V4M19 20v-7" />,
   bot: <path d="M12 3v3M5 7h14v11H5zM9.5 12h.01M14.5 12h.01" />, user: <path d="M12 12a4 4 0 100-8 4 4 0 000 8zM4 21c0-4 4-6 8-6s8 2 8 6" />,
   play: <path d="M7 5l12 7-12 7z" />, stop: <rect x="6" y="6" width="12" height="12" rx="1" />, out: <path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10" />,
@@ -57,10 +58,11 @@ export function SignalCard({ s }: { s: Signal }) {
         {s.outcome && <span className={r >= 0 ? 'ok' : 'neg'} style={{ marginLeft: 'auto', fontFamily: 'var(--mono)', fontSize: 13 }}>{r >= 0 ? '+' : ''}{r.toFixed(1)}R</span>}
       </div>
       {s.timeframe && <div className="sub">{s.symbol} · {s.timeframe}{hold && ` · ${hold}`}</div>}
-      <div className="stats3">
-        <div><div className="lab">Entry</div><div className="val">{s.entry}</div></div>
-        <div><div className="lab">Stop</div><div className="val">{sl ?? '-'}</div></div>
-        <div><div className="lab">Targets</div><div className="val">{tp1 ?? 'Not given'}{s.tp2 != null && <small>then {s.tp2}</small>}</div></div>
+      <div className="pills">
+        <div className="pill entry"><span className="pl">ENTRY</span><span className="pv">{s.entry}</span></div>
+        <div className="pill sl"><span className="pl">STOP LOSS</span><span className="pv">{sl ?? '-'}</span></div>
+        {tp1 != null && <div className="pill tp"><span className="pl">TAKE PROFIT 1</span><span className="pv">{tp1}</span></div>}
+        {s.tp2 != null && <div className="pill tp"><span className="pl">TAKE PROFIT 2</span><span className="pv">{s.tp2}</span></div>}
       </div>
       {s.ai_note && <div className="sub" style={{ marginTop: 6, lineHeight: 1.45 }}>{s.ai_note}</div>}
       {s.win_rate != null && s.pf != null && <div className="sub" style={{ marginTop: 0 }}>Backtest: {Math.round(s.win_rate * 100)}% wins · profit factor {s.pf} · {s.bt_trades} trades</div>}
