@@ -9,7 +9,7 @@ import { pathToFileURL } from 'node:url'
 const files = readdirSync('api').filter((f) => f.endsWith('.ts')).map((f) => join('api', f))
 const out = mkdtempSync(join(tmpdir(), 'api-'))
 writeFileSync(join(out, 'package.json'), '{"type":"module"}')
-await build({ entryPoints: files, outdir: out, format: 'esm', platform: 'node', logLevel: 'error' })
+await build({ entryPoints: files, outdir: out, format: 'esm', platform: 'node', bundle: true, logLevel: 'error' })
 let bad = 0
 for (const f of readdirSync(out).filter((x) => x.endsWith('.js'))) {
   try { await import(pathToFileURL(join(out, f)).href) } catch (e) { bad++; console.error(`api/${f.replace(/\.js$/, '.ts')} cannot load: ${String(e.message).split('\n')[0]}`) }

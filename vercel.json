@@ -1,5 +1,39 @@
 {
   "framework": "vite",
   "buildCommand": "npm run build",
-  "outputDirectory": "dist"
+  "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/api/ping",
+      "destination": "/api/system?op=ping"
+    },
+    {
+      "source": "/api/health",
+      "destination": "/api/system?op=health"
+    },
+    {
+      "source": "/api/deriv-link",
+      "destination": "/api/deriv?op=link"
+    },
+    {
+      "source": "/api/deriv-kill",
+      "destination": "/api/deriv?op=kill"
+    },
+    {
+      "source": "/api/deriv-results",
+      "destination": "/api/deriv?op=results"
+    },
+    {
+      "source": "/api/test-trade",
+      "destination": "/api/deriv?op=test"
+    },
+    {
+      "source": "/api/exness-link",
+      "destination": "/api/exness?op=link"
+    },
+    {
+      "source": "/api/exness-execute",
+      "destination": "/api/exness?op=execute"
+    }
+  ]
 }
