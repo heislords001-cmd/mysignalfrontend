@@ -42,7 +42,7 @@ export default async function handler(req: Req, res: Res) {
     const action = req.body?.action
     const token = process.env.GITHUB_SCANNER_TOKEN ?? ''
     const repo = (process.env.SCANNER_REPO || SCANNER_REPO_DEFAULT).trim()
-    if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo)) return res.status(500).json({ error: 'SCANNER_REPO must be owner/repo (your scanner repository). The scanner was NOT started.' })
+    if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo)) return res.status(500).json({ error: `SCANNER_REPO in Vercel is "${repo}", which is not owner/repo. Fix it to heislords001-cmd/my-signalbackend, or delete the variable so the default is used. The scanner was NOT started.` })
     const setRunning = (on: boolean) => fetch(`${sb}/rest/v1/scanner_state?id=eq.1`, { method: 'PATCH', headers: { ...h, Prefer: 'return=minimal' }, body: JSON.stringify({ running: on }) })
 
     if (action === 'stop') {

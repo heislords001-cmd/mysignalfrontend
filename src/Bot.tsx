@@ -50,7 +50,7 @@ export function EquityChart({ uid }: { uid: string }) {
 
   return (
     <div className="card">
-      <div className="row"><h3 style={{ margin: 0 }}>Live analysis</h3><span className={last >= 0 ? 'ok' : 'neg'}>{last >= 0 ? '+' : ''}{usd(last)}</span></div>
+      <div className="row"><h3 style={{ margin: 0 }}>Live analysis</h3><span className={last >= 0 ? 'ok' : 'neg'}>{usd(last)}</span></div>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block', margin: '8px 0' }}>
         <line x1={PAD} y1={zero} x2={W - PAD} y2={zero} stroke="var(--ln)" strokeWidth="0.5" strokeDasharray="3,3" />
         <polygon className="eq-fill" points={`${toX(0)},${zero} ${pts} ${toX(P.length - 1)},${zero}`} fill={color} fillOpacity="0.12" />
