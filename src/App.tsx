@@ -37,7 +37,7 @@ function Shell({ session }: { session: Session }) {
     <>
       <div className="app">
         <div className="bar"><Brand /><div className="row" style={{ gap: 8 }}><ThemeToggle /><button className="btn sm" onClick={() => supabase.auth.signOut()}><Icon n="out" />Sign out</button></div></div>
-        {tab === 'home' && <Home admin={admin} access={access} goPlan={() => setTab('pro')} />}
+        {tab === 'home' && <Home uid={profile.id} admin={admin} access={access} goPlan={() => setTab('pro')} />}
         {tab === 'sig' && <Signals access={access} goPlan={() => setTab('pro')} />}
         {tab === 'bot' && <Bot uid={profile.id} admin={admin} botAccess={botAccess} goPlan={() => setTab('pro')} />}
         {tab === 'pro' && <Profile profile={profile} sub={sub} botAccess={botAccess} refresh={refresh} />}

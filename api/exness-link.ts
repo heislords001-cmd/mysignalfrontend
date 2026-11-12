@@ -1,7 +1,7 @@
 // Save and verify an Exness API key. Stores it encrypted, same pattern as Deriv.
 import { encrypt } from './_crypto.js'
 import { dbHeaders, env, hasBotAccess, userFromJwt } from './_auth.js'
-import { exnessConfigured, listAccounts } from './_exness.js'
+import { exnessConfigured, getAccountInfo } from './_exness.js'
 
 interface Req { method?: string; headers: Record<string, string | undefined>; body?: { api_key?: string; private_key?: string; account_id?: string; discovery_url?: string } }
 interface Res { status(c: number): Res; json(b: unknown): void }
@@ -25,11 +25,9 @@ export default async function handler(req: Req, res: Res) {
     if (!process.env.TOKEN_ENCRYPTION_KEY) return res.status(500).json({ error: 'TOKEN_ENCRYPTION_KEY not set in Vercel.' })
 
     // Verify by listing accounts
-    const r = await listAccounts()
+    const r = await getAccountInfo()
     if (!r.ok) return res.status(400).json({ error: `Exness rejected the credentials: ${r.message}` })
-    const demo = r.data.find((a) => a.account_type === 'demo' || a.account_id === process.env.EXN_ACCOUNT_ID)
-    const acct = demo ?? r.data[0]
-    if (!acct) return res.status(400).json({ error: 'No account found with these credentials.' })
+    const acct = r.data
 
     // Store encrypted private key
     const blob = encrypt(process.env.EXN_PRIVATE_KEY!)

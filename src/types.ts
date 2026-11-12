@@ -4,6 +4,7 @@ export type Signal = {
   sl: number | null; tp1: number | null; tp2: number | null; expires_at: string | null; max_hold_min: number | null
   win_rate: number | null; pf: number | null; bt_trades: number | null; outcome: string | null; result_r: number | null
   approved?: boolean
+  ai_note?: string | null
   scalp_tp: number | null; runner_sl: number | null   // older signals
 }
 export type StratStat = { symbol: string; timeframe: string; strategy: string; enabled: boolean; trades: number; win_rate: number; pf: number; test_pf: number; test_n: number; updated_at: string }

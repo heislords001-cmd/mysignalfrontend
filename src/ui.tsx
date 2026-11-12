@@ -62,6 +62,7 @@ export function SignalCard({ s }: { s: Signal }) {
         <div><div className="lab">Stop</div><div className="val">{sl ?? '-'}</div></div>
         <div><div className="lab">Targets</div><div className="val">{tp1 ?? 'Not given'}{s.tp2 != null && <small>then {s.tp2}</small>}</div></div>
       </div>
+      {s.ai_note && <div className="sub" style={{ marginTop: 6, lineHeight: 1.45 }}>{s.ai_note}</div>}
       {s.win_rate != null && s.pf != null && <div className="sub" style={{ marginTop: 0 }}>Backtest: {Math.round(s.win_rate * 100)}% wins · profit factor {s.pf} · {s.bt_trades} trades</div>}
       <div className="foot2"><span>{note}{live && s.expires_at ? ` · valid for ${left(s.expires_at)}` : ''}</span><span>{ago(s.created_at)}</span></div>
     </div>

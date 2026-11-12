@@ -1,4 +1,4 @@
-:root{color-scheme:dark;--bg:#050505;--sf:#0d0d0f;--rs:#161619;--ln:#242428;--tx:#ececf0;--mu:#8c8c97;--ac:#4d8dff;--on-ac:#04102b;--buy:#2fbf71;--sell:#ee5a5f;--buy-solid:#2fbf71;--on-buy:#04170c;--sell-solid:#c93a3f;--on-sell:#ffffff;--buy-bg:#12301f;--sell-bg:#34171a;--brown:#d9922e;--brown-bg:#33210b;--sans:'Geist',system-ui,sans-serif;--mono:'Geist Mono',ui-monospace,monospace}
+:root{color-scheme:dark;--bg:#0a0a0a;--sf:#111111;--rs:#171717;--ln:#262626;--tx:#ececf0;--mu:#8c8c97;--ac:#4d8dff;--on-ac:#04102b;--buy:#2fbf71;--sell:#ee5a5f;--buy-solid:#2fbf71;--on-buy:#04170c;--sell-solid:#c93a3f;--on-sell:#ffffff;--buy-bg:#12301f;--sell-bg:#34171a;--brown:#d9922e;--brown-bg:#33210b;--sans:'Geist',system-ui,sans-serif;--mono:'Geist Mono',ui-monospace,monospace}
 :root[data-theme="light"]{color-scheme:light;--bg:#f7f5f2;--sf:#ffffff;--rs:#efece7;--ln:#e1dcd4;--tx:#1c1813;--mu:#6a625a;--ac:#2563eb;--on-ac:#ffffff;--buy:#146c36;--sell:#c62828;--buy-solid:#15803d;--on-buy:#ffffff;--sell-solid:#c62828;--on-sell:#ffffff;--buy-bg:#e3f4ea;--sell-bg:#fbe7e7;--brown:#8a5a12;--brown-bg:#f6ead6}
 *{box-sizing:border-box}html,body{overflow-x:hidden;margin:0;background:var(--bg);color:var(--tx);font:15px/1.55 var(--sans)}
 button,input{font:inherit;color:inherit}button:focus-visible,input:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
@@ -60,3 +60,14 @@ input[type=text],input[type=number],input[type=email],input[type=password]{backg
 .iconbtn{padding:7px;width:36px;height:34px}
 .tile{width:44px;height:44px;border-radius:12px;background:var(--brown-bg);color:var(--brown);display:grid;place-items:center;flex:none}
 .tile i svg{width:22px;height:22px}
+
+/* trend line: draws upward when the scanner starts, then stays put */
+@keyframes drawLine { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes growUp { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes popDot { from { opacity: 0; } to { opacity: 1; } }
+.eq-line { stroke-dasharray: 1; stroke-dashoffset: 1; animation: drawLine 1.8s ease-out forwards; }
+.eq-fill { transform-box: fill-box; transform-origin: 50% 100%; animation: growUp 1.8s ease-out forwards; }
+.eq-dot { opacity: 0; animation: popDot 0.3s ease-out 1.8s forwards; }
+@media (prefers-reduced-motion: reduce) { .eq-line, .eq-fill, .eq-dot { animation: none; stroke-dashoffset: 0; opacity: 1; transform: none; } }
+/* Start scanner is red */
+.btn.start { background: var(--sell-solid); border-color: var(--sell-solid); color: #fff; }

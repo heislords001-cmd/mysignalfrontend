@@ -16,7 +16,6 @@ const Bar = ({ label, text, v, max }: { label: string; text: string; v: number; 
 
 export function EquityChart({ uid }: { uid: string }) {
   const [points, setPoints] = useState<{ t: string; v: number }[]>([])
-  const [acct, setAcct] = useState<{ balance: number; equity: number; floating: number } | null>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -24,28 +23,27 @@ export function EquityChart({ uid }: { uid: string }) {
         .select('profit, closed_at, created_at')
         .eq('user_id', uid).eq('status', 'bought')
         .order('created_at', { ascending: true }).limit(200)
-      if (!data?.length) return
       let running = 0
-      const pts = data.map((r: any) => {
+      setPoints((data ?? []).map((r: any) => {
         running += Number(r.profit ?? 0)
         return { t: r.closed_at ?? r.created_at, v: Math.round(running * 100) / 100 }
-      })
-      setPoints(pts)
+      }))
     }
     load()
     const t = setInterval(load, 30000)
     return () => clearInterval(t)
   }, [uid])
 
-  if (!points.length) return null
-
+  // with no finished trades yet, the line still draws, flat on zero, so the chart is visible from the moment you start
+  const P = points.length ? points : [{ t: '', v: 0 }]
   const W = 300, H = 100, PAD = 8
-  const vals = points.map((p) => p.v)
+  const vals = P.map((p) => p.v)
   const min = Math.min(...vals, 0), max = Math.max(...vals, 0.01)
   const range = max - min || 1
-  const toX = (i: number) => PAD + (i / (points.length - 1)) * (W - PAD * 2)
+  const span = Math.max(1, P.length - 1)
+  const toX = (i: number) => PAD + (i / span) * (W - PAD * 2)
   const toY = (v: number) => H - PAD - ((v - min) / range) * (H - PAD * 2)
-  const pts = points.map((p, i) => `${toX(i).toFixed(1)},${toY(p.v).toFixed(1)}`).join(' ')
+  const pts = P.map((p, i) => `${toX(i).toFixed(1)},${toY(p.v).toFixed(1)}`).join(' ')
   const last = vals[vals.length - 1]
   const color = last >= 0 ? 'var(--buy)' : 'var(--sell)'
   const zero = toY(0)
@@ -54,27 +52,93 @@ export function EquityChart({ uid }: { uid: string }) {
     <div className="card">
       <div className="row"><h3 style={{ margin: 0 }}>Live analysis</h3><span className={last >= 0 ? 'ok' : 'neg'}>{last >= 0 ? '+' : ''}{usd(last)}</span></div>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block', margin: '8px 0' }}>
-        <defs>
-          <linearGradient id="eqgrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity="0.25" />
-            <stop offset="100%" stopColor={color} stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        {/* zero line */}
         <line x1={PAD} y1={zero} x2={W - PAD} y2={zero} stroke="var(--ln)" strokeWidth="0.5" strokeDasharray="3,3" />
-        {/* fill under the line */}
-        <polygon points={`${toX(0)},${zero} ${pts} ${toX(points.length - 1)},${zero}`} fill="url(#eqgrad)" />
-        {/* the equity line */}
-        <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        {/* current value dot */}
-        <circle cx={toX(points.length - 1)} cy={toY(last)} r="3" fill={color} />
+        <polygon className="eq-fill" points={`${toX(0)},${zero} ${pts} ${toX(P.length - 1)},${zero}`} fill={color} fillOpacity="0.12" />
+        <polyline className="eq-line" pathLength="1" points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        <circle className="eq-dot" cx={toX(P.length - 1)} cy={toY(last)} r="3" fill={color} />
       </svg>
       <div className="stats c3 ml">
         <div className="stat"><span className="mu">Detecting market</span><span className="ok">●</span></div>
         <div className="stat"><span className="mu">Calibrating SL</span><span className="ok">●</span></div>
         <div className="stat"><span className="mu">AI scoring</span><span className="ok">●</span></div>
       </div>
-      <p className="mu">Bot is monitoring your demo account.</p>
+      <p className="mu">{points.length ? 'Running profit from your finished trades.' : 'Your running profit will draw here as trades finish.'}</p>
+    </div>
+  )
+}
+
+export function ChartRead({ uid }: { uid: string }) {
+  const [on, setOn] = useState<boolean | undefined>(undefined)
+  const [file, setFile] = useState<File | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+  const [out, setOut] = useState<any>(null)
+
+  useEffect(() => {
+    supabase.from('user_settings').select('data').eq('user_id', uid).maybeSingle().then(({ data }) => {
+      setOn(((data?.data ?? {}) as Record<string, unknown>).chart_read_on === true)
+    })
+  }, [uid])
+
+  const toggle = async (v: boolean) => {
+    setOn(v); setMsg(''); setOut(null)
+    const { data } = await supabase.from('user_settings').select('data').eq('user_id', uid).maybeSingle()
+    const merged = { ...((data?.data ?? {}) as object), chart_read_on: v }
+    await supabase.from('user_settings').upsert({ user_id: uid, data: merged }, { onConflict: 'user_id' })
+  }
+
+  const read = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!file) return setMsg('Choose a screenshot first.')
+    if (file.size > 2 * 1024 * 1024) return setMsg('Screenshot is over 2 MB. Crop it or take a smaller one.')
+    setBusy(true); setMsg(''); setOut(null)
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const fr = new FileReader(); fr.onload = () => resolve(String(fr.result)); fr.onerror = () => reject(new Error('Could not read the file.')); fr.readAsDataURL(file)
+    }).catch((err) => { setMsg(err.message); return '' })
+    if (!dataUrl) { setBusy(false); return }
+    const { data } = await supabase.auth.getSession()
+    const res = await fetch('/api/chart-read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token ?? ''}` },
+      body: JSON.stringify({ image: dataUrl }),
+    })
+    const j = (await res.json().catch(() => ({}))) as any
+    setBusy(false)
+    if (!res.ok) return setMsg(j.error ?? `The chart read failed (status ${res.status}).`)
+    setOut(j)
+  }
+
+  if (on === undefined) return null
+  return (
+    <div className="card">
+      <div className="row"><h3 style={{ margin: 0 }}>Chart reading</h3>
+        <label className="sw" style={{ margin: 0 }}><input type="checkbox" checked={on} onChange={(e) => toggle(e.target.checked)} /></label></div>
+      {!on && <p className="mu">Optional. Switch on to upload a chart screenshot and get a written read of it. Off by default. It never places a trade.</p>}
+      {on && (
+        <>
+          <p className="mu">Upload a screenshot and get a written read: trend, pattern and what would change it. This is an opinion from a picture. It is not a signal and never trades. Up to 10 reads a day.</p>
+          <form onSubmit={read}>
+            <label className="f" style={{ marginTop: 10 }}>Screenshot (PNG, JPEG or WEBP, up to 2 MB)
+              <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            </label>
+            <p style={{ marginBottom: 0, marginTop: 10 }}><button className="btn brown" type="submit" disabled={busy || !file}>{busy ? 'Reading the chart...' : 'Read this chart'}</button></p>
+          </form>
+          {msg && <p className="err" style={{ wordBreak: 'break-word' }}>{msg}</p>}
+          {out && (
+            <div className="ml">
+              <div className="row"><b>{out.symbol} · {out.timeframe}</b><span className="tg">Bias: {out.read.bias}</span></div>
+              <p className="mu"><b>Structure.</b> {out.read.structure}</p>
+              <p className="mu"><b>Pattern.</b> {out.read.pattern}</p>
+              <p className="mu"><b>Price areas seen.</b> {out.read.observed_levels}</p>
+              <p className="mu"><b>What would change it.</b> {out.read.what_would_change_it}</p>
+              <p className="mu"><b>Confidence.</b> {Math.round((out.read.confidence ?? 0) * 100)}%</p>
+              <p className="mu"><b>Can't tell from a screenshot.</b> {out.read.caveats}</p>
+              <p className="mu"><b>Our data.</b> {out.reference}</p>
+              <p className="mu" style={{ fontSize: 12 }}>{out.disclaimer}</p>
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }
@@ -376,6 +440,7 @@ export default function Bot({ uid, admin = false, botAccess, goPlan }: { uid: st
     <>
       <DerivLink uid={uid} onLink={setLinked} />
       <ExnessLink uid={uid} />
+      <ChartRead uid={uid} />
       <div className="card">
         <div className="row">
           <div>
@@ -396,7 +461,6 @@ export default function Bot({ uid, admin = false, botAccess, goPlan }: { uid: st
         )}
       </div>
       {linked && <TradeSettings uid={uid} admin={admin} />}
-      {linked && <EquityChart uid={uid} />}
       {linked && <ResultsCard uid={uid} />}
       {linked && <ExecList uid={uid} />}
       {mt5 && <>

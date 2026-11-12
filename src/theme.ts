@@ -9,7 +9,7 @@ export function initialTheme(): Theme {
     const saved = localStorage.getItem(KEY)
     if (saved === 'light' || saved === 'dark') return saved
   } catch { /* storage blocked */ }
-  return typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
+  return 'dark'   // matte black by default on every device; the toggle still switches to light
 }
 
 export function applyTheme(t: Theme) {
