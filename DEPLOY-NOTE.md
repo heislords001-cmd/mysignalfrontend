@@ -1,4 +1,4 @@
 # Deploy note
 
-Full site rebuild: api/ now has 9 functions, shared code is in lib/, and the Exness fix is included.
-Upload the CONTENTS of this zip to the repo root (api/, lib/, src/, public/, package.json, vercel.json all sit at the top level).
+Full site: api/ (9 functions), lib/ (shared code and handlers), src/, public/, package.json, vercel.json.
+Upload the CONTENTS of this zip to the repo root, so api/, lib/ and src/ sit at the top level.
