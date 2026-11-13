@@ -107,3 +107,5 @@ input[type=text],input[type=number],input[type=email],input[type=password]{backg
 .pill.entry { border-color:#4d8dff; color:#4d8dff; }
 .pill.sl { border-color:#ee5a5f; color:#ee5a5f; }
 .pill.tp { border-color:#2fbf71; color:#2fbf71; }
+
+.copy-btn { min-width:64px; }

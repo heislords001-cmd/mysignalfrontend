@@ -3,7 +3,7 @@
 // Trade levels come only from our own market data (market_state), shown next to the read for reference.
 // The image is used for the one request and is NOT stored. Only the text read is saved.
 import { dbHeaders, env, userFromJwt } from '../_auth.js'
-import { aiModel } from '../_ai.js'
+import { askVision } from '../_ai.js'
 
 interface Req { method?: string; headers: Record<string, string | undefined>; body?: { image?: string } }
 interface Res { status(c: number): Res; json(b: unknown): void }
@@ -13,7 +13,6 @@ const PAIRS = ['EURUSD', 'USDJPY', 'USDCAD', 'USDCHF', 'AUDUSD', 'XAUUSD']
 const TIMEFRAMES = ['M5', 'M15', 'H1', 'H4', 'D1']
 const MAX_BYTES = 2 * 1024 * 1024
 const DAILY_LIMIT = 10
-const MODEL = (process.env.NVIDIA_VISION_MODEL ?? '').trim() || aiModel()   // NVIDIA_MODEL drives every call; NVIDIA_VISION_MODEL overrides only the chart reader
 
 // Checks the real file type from its first bytes, not just the text the browser sends
 function imageKind(bytes: Buffer): 'png' | 'jpeg' | 'webp' | null {
@@ -61,21 +60,9 @@ export default async function handler(req: Req, res: Res) {
     const today = (await (await fetch(`${sb}/rest/v1/chart_reads?user_id=eq.${user.id}&created_at=gte.${midnight.toISOString()}&select=id`, { headers: h })).json()) as unknown[]
     if (Array.isArray(today) && today.length >= DAILY_LIMIT) return res.status(429).json({ error: `Daily limit of ${DAILY_LIMIT} chart reads reached. It resets at midnight UTC.` })
 
-    const r = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${process.env.NVIDIA_API_KEY}`, 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({
-        model: MODEL, max_tokens: 700, temperature: 0.1,
-        messages: [{ role: 'user', content: [
-          { type: 'text', text: PROMPT() },
-          { type: 'image_url', image_url: { url: `data:image/${kind};base64,${m[2]}` } },
-        ] }],
-      }),
-      signal: AbortSignal.timeout(45000),
-    })
-    if (!r.ok) return res.status(502).json({ error: `The chart reader could not answer (${r.status}). Try again shortly.` })
-    const j = (await r.json()) as { choices?: { message?: { content?: string } }[] }
-    const text = j.choices?.[0]?.message?.content ?? ''
+    const ai = await askVision(PROMPT(), `data:image/${kind};base64,${m[2]}`)
+    if (!ai.ok) return res.status(502).json({ error: `The chart reader could not answer (status ${ai.status ?? 'none'}, model ${ai.model || 'not set'}). ${ai.detail}`.trim() })
+    const text = ai.text
     const start = text.indexOf('{'), end = text.lastIndexOf('}') + 1
     let read: Record<string, unknown>
     try { read = JSON.parse(text.slice(start, end)) } catch { return res.status(502).json({ error: 'The chart reader answered in an unexpected format. Nothing was saved. Try again.' }) }

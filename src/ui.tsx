@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import type { Signal } from './types'
 import { useTheme } from './theme'
 
@@ -40,6 +40,43 @@ export function Locked({ go, title = 'Signals need an active plan', text = 'Get 
   )
 }
 
+
+// The text that gets copied: plain lines that paste cleanly anywhere.
+export function signalText(s: Signal): string {
+  const hm = s.max_hold_min ? Math.floor(s.max_hold_min / 60) : 0, hmin = s.max_hold_min ? s.max_hold_min % 60 : 0
+  const hold = s.max_hold_min ? ` · hold up to ${hm}h${hmin ? ` ${hmin}m` : ''}` : ''
+  const lines = [
+    `${String(s.side).toUpperCase()} ${s.symbol}${s.timeframe ? ` · ${s.timeframe}` : ''}${hold}`,
+    `ENTRY: ${s.entry}`,
+    `STOP LOSS: ${s.sl ?? '-'}`,
+    `TAKE PROFIT 1: ${s.tp1 ?? '-'}`,
+  ]
+  if (s.tp2 != null) lines.push(`TAKE PROFIT 2: ${s.tp2}`)
+  if (s.approved === false) lines.push('Status: untested signal')
+  return lines.join('\n')
+}
+
+export function CopyButton({ text }: { text: string }) {
+  const [done, setDone] = useState(false)
+  const copy = async () => {
+    let ok = false
+    try {
+      await navigator.clipboard.writeText(text)
+      ok = true
+    } catch {
+      // older browsers and some phones block the clipboard API: fall back to a hidden text box
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.style.position = 'fixed'; ta.style.opacity = '0'
+      document.body.appendChild(ta); ta.select()
+      ok = document.execCommand('copy')
+      document.body.removeChild(ta)
+    }
+    if (ok) { setDone(true); setTimeout(() => setDone(false), 1800) }
+  }
+  return <button className="btn sm copy-btn" onClick={copy} aria-label="Copy signal">{done ? 'Copied' : 'Copy'}</button>
+}
+
 export function SignalCard({ s }: { s: Signal }) {
   const sl = s.sl ?? s.runner_sl, tp1 = s.tp1 ?? s.scalp_tp
   const live = !s.outcome && !!s.expires_at && new Date(s.expires_at).getTime() > Date.now()
@@ -56,6 +93,7 @@ export function SignalCard({ s }: { s: Signal }) {
         <span className={`badge ${status.c}`}>{status.c === 'live' && <span className="dot2" />}{status.t}</span>
         {s.approved === false && <span className="badge test">Untested</span>}
         {s.outcome && <span className={r >= 0 ? 'ok' : 'neg'} style={{ marginLeft: 'auto', fontFamily: 'var(--mono)', fontSize: 13 }}>{r >= 0 ? '+' : ''}{r.toFixed(1)}R</span>}
+        {!s.outcome && <span style={{ marginLeft: 'auto' }}><CopyButton text={signalText(s)} /></span>}
       </div>
       {s.timeframe && <div className="sub">{s.symbol} · {s.timeframe}{hold && ` · ${hold}`}</div>}
       <div className="pills">
