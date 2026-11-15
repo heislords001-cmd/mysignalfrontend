@@ -28,7 +28,7 @@ export const ago = (iso: string | null) => {
 export const usd = (n: number) => `${n < 0 ? '-' : '+'}$${Math.abs(n).toFixed(2)}`
 export const day = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 
-export const STRAT: Record<string, string> = { trend_pullback: 'Trend pullback', structure_retest: 'Structure retest' }
+export const STRAT: Record<string, string> = { trend_pullback: 'Trend pullback', structure_retest: 'Structure retest', ema_cross_scalp: 'EMA cross scalp', fvg_retrace: 'Fair value gap' }
 const left = (iso: string) => {
   const m = Math.round((new Date(iso).getTime() - Date.now()) / 60000)
   return m <= 0 ? null : m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`
@@ -52,6 +52,7 @@ export function signalText(s: Signal): string {
     `TAKE PROFIT 1: ${s.tp1 ?? '-'}`,
   ]
   if (s.tp2 != null) lines.push(`TAKE PROFIT 2: ${s.tp2}`)
+  if (s.agreement) lines.push(`Timeframes: ${s.agreement}`)
   if (s.approved === false) lines.push('Status: untested signal')
   return lines.join('\n')
 }
@@ -83,8 +84,14 @@ export function SignalCard({ s }: { s: Signal }) {
   const r = s.result_r ?? 0
   const status = s.outcome === 'tp' ? { c: 'win', t: 'Win' } : s.outcome === 'sl' ? { c: 'loss', t: 'Loss' }
     : s.outcome === 'expired' ? { c: 'open', t: 'Ended' } : live ? { c: 'live', t: 'Live' } : { c: 'open', t: 'Open' }
-  const hold = s.max_hold_min ? `hold up to ${Math.round(s.max_hold_min / 60)}h` : ''
-  const note = s.strategy ? `${STRAT[s.strategy] ?? s.strategy}${s.htf ? ` · ${s.htf} trend agrees` : ''}` : ''
+  const hold = s.max_hold_min ? `hold ${Math.round(s.max_hold_min / 60)}h` : ''
+  const strat = s.strategy ? (STRAT[s.strategy] ?? s.strategy) : ''
+  const fmt = (ms: number) => { const m = Math.round(ms / 60000); return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ''}` }
+  const winMs = s.expires_at && s.created_at ? new Date(s.expires_at).getTime() - new Date(s.created_at).getTime() : 0
+  const winTxt = winMs > 0 ? `valid ${fmt(winMs)}` : ''
+  const leftTxt = s.expires_at ? (live ? `valid for ${left(s.expires_at)} more` : 'validity ended') : ''
+  const meta = [s.timeframe, hold, strat, winTxt].filter(Boolean).join(' · ')
+  const backtest = s.win_rate != null && s.pf != null ? `${Math.round(s.win_rate * 100)}% wins · PF ${s.pf} · ${s.bt_trades} trades` : ''
   return (
     <div className="scard">
       <div className="top">
@@ -92,19 +99,25 @@ export function SignalCard({ s }: { s: Signal }) {
         <span className={`badge ${s.side}`}>{s.side}</span>
         <span className={`badge ${status.c}`}>{status.c === 'live' && <span className="dot2" />}{status.t}</span>
         {s.approved === false && <span className="badge test">Untested</span>}
-        {s.outcome && <span className={r >= 0 ? 'ok' : 'neg'} style={{ marginLeft: 'auto', fontFamily: 'var(--mono)', fontSize: 13 }}>{r >= 0 ? '+' : ''}{r.toFixed(1)}R</span>}
-        {!s.outcome && <span style={{ marginLeft: 'auto' }}><CopyButton text={signalText(s)} /></span>}
+        <span className="right">
+          {s.outcome
+            ? <span className={r >= 0 ? 'ok' : 'neg'} style={{ fontFamily: 'var(--mono)', fontSize: 13 }}>{r >= 0 ? '+' : ''}{r.toFixed(1)}R</span>
+            : <CopyButton text={signalText(s)} />}
+        </span>
       </div>
-      {s.timeframe && <div className="sub">{s.symbol} · {s.timeframe}{hold && ` · ${hold}`}</div>}
-      <div className="pills">
+      {meta && <div className="meta">{meta}</div>}
+      <div className="pills tight">
         <div className="pill entry"><span className="pl">ENTRY</span><span className="pv">{s.entry}</span></div>
-        <div className="pill sl"><span className="pl">STOP LOSS</span><span className="pv">{sl ?? '-'}</span></div>
-        {tp1 != null && <div className="pill tp"><span className="pl">TAKE PROFIT 1</span><span className="pv">{tp1}</span></div>}
-        {s.tp2 != null && <div className="pill tp"><span className="pl">TAKE PROFIT 2</span><span className="pv">{s.tp2}</span></div>}
+        <div className="pill sl"><span className="pl">STOP</span><span className="pv">{sl ?? '-'}</span></div>
+        {tp1 != null && <div className="pill tp"><span className="pl">TP1</span><span className="pv">{tp1}</span></div>}
+        {s.tp2 != null && <div className="pill tp"><span className="pl">TP2</span><span className="pv">{s.tp2}</span></div>}
       </div>
-      {s.ai_note && <div className="sub" style={{ marginTop: 6, lineHeight: 1.45 }}>{s.ai_note}</div>}
-      {s.win_rate != null && s.pf != null && <div className="sub" style={{ marginTop: 0 }}>Backtest: {Math.round(s.win_rate * 100)}% wins · profit factor {s.pf} · {s.bt_trades} trades</div>}
-      <div className="foot2"><span>{note}{live && s.expires_at ? ` · valid for ${left(s.expires_at)}` : ''}</span><span>{ago(s.created_at)}</span></div>
+      {s.agreement && <div className="meta">Timeframes: {s.agreement}</div>}
+      {s.ai_note && <div className="note">{s.ai_note}</div>}
+      <div className="foot2">
+        <span>{[leftTxt, backtest].filter(Boolean).join(' · ')}</span>
+        <span>{ago(s.created_at)}</span>
+      </div>
     </div>
   )
 }
