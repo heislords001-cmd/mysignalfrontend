@@ -150,3 +150,7 @@ html, body, #root { width:100%; max-width:100%; overflow-x:hidden; }
 .pill .pv { font-size:12px; }
 .scard .top { flex-wrap:wrap; }
 img, svg, video { max-width:100%; height:auto; }
+
+/* signal levels: show the full price on one line, never truncated */
+.pills.tight .pill { flex:1 1 0; padding:6px 6px; overflow:visible; }
+.pills.tight .pill .pv { font-size:12px; white-space:nowrap; overflow:visible; text-overflow:clip; max-width:none; letter-spacing:-0.01em; }

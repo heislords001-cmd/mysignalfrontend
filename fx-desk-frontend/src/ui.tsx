@@ -45,6 +45,7 @@ export function SignalCard({ s }: { s: Signal }) {
         <span className="sym">{s.symbol}</span>
         <span className={`badge ${s.side}`}>{s.side}</span>
         <span className={`badge ${status.c}`}>{status.c === 'live' && <span className="dot2" />}{status.t}</span>
+        {s.approved === false && <span className="badge open">Untested</span>}
         {s.outcome && <span className={r >= 0 ? 'ok' : 'neg'} style={{ marginLeft: 'auto', fontFamily: 'var(--mono)', fontSize: 13 }}>{r >= 0 ? '+' : ''}{r.toFixed(1)}R</span>}
       </div>
       {s.timeframe && <div className="sub">{s.symbol} · {s.timeframe}{hold && ` · ${hold}`}</div>}

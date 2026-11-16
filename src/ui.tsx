@@ -110,7 +110,6 @@ export function SignalCard({ s }: { s: Signal }) {
         <div className="pill entry"><span className="pl">ENTRY</span><span className="pv">{s.entry}</span></div>
         <div className="pill sl"><span className="pl">STOP</span><span className="pv">{sl ?? '-'}</span></div>
         {tp1 != null && <div className="pill tp"><span className="pl">TP1</span><span className="pv">{tp1}</span></div>}
-        {s.tp2 != null && <div className="pill tp"><span className="pl">TP2</span><span className="pv">{s.tp2}</span></div>}
       </div>
       {s.risk_warning && <div className="warn">⚠ {s.risk_warning}</div>}
       {s.agreement && <div className="meta">Timeframes: {s.agreement}</div>}

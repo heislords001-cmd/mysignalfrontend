@@ -118,7 +118,7 @@ export default function Profile({ profile, sub, botAccess, refresh }: { profile:
       {tab === 'bot' && <div className="card"><h3>Bot access</h3>
         {botAccess ? <>
           <div className="row"><span className="mu">Your bot</span><b className={online ? 'ok' : 'neg'}>{online ? 'Online' : 'Offline'}</b></div>
-          <p className="mu">The bot runs on your own Windows PC next to MT5, on your own broker account. Your broker password stays on your PC.</p>
+          <p className="mu">Connect your Deriv account by pasting your Deriv API key in the Bot tab. Advanced option: you can instead run the MT5 bot on your own Windows PC, using the download below.</p>
           <p><a className="btn p" href="/fx-bot.zip" download>Download the bot</a></p>
           <ol className="mu"><li>Log in to MT5 on your PC (start with a demo account)</li><li>Unzip the bot, rename env.example to .env and fill it in</li><li>Run pip install -r requirements.txt, then python bot.py</li><li>Open the Bot tab and turn it on</li></ol></>
           : <><p className="mu">Auto-trading is part of the Signals + Auto-trading plan.</p><button className="btn p" onClick={() => setTab('plan')}>See plans</button></>}</div>}

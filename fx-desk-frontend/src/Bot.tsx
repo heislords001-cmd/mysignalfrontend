@@ -1,12 +1,61 @@
 import { useCallback, useEffect, useState } from 'react'
+import type { FormEvent } from 'react'
 import { supabase } from './supabase'
 import { Locked, ago, usd } from './ui'
 import { DEFAULTS } from './types'
-import type { BotAccount, BotPos, BotState, Cfg } from './types'
+import type { BotAccount, BotPos, BotState, BrokerLink, Cfg } from './types'
 
 const Bar = ({ label, text, v, max }: { label: string; text: string; v: number; max: number }) => {
   const pct = max > 0 ? Math.min(100, (v / max) * 100) : 0
   return <><div className="row"><span>{label}</span><span className="mu">{text}</span></div><div className={`pg ${pct >= 80 ? 'hot' : ''}`}><span style={{ width: `${pct}%` }} /></div></>
+}
+
+export function DerivLink({ uid }: { uid: string }) {
+  const [link, setLink] = useState<BrokerLink | null | undefined>(undefined)
+  const [key, setKey] = useState('')
+  const [msg, setMsg] = useState('')
+  const [bad, setBad] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const load = useCallback(() => { supabase.from('broker_links').select('*').eq('user_id', uid).maybeSingle().then(({ data }) => setLink((data as BrokerLink | null) ?? null)) }, [uid])
+  useEffect(() => { load() }, [load])
+  const call = async (method: 'POST' | 'DELETE', body?: object) => {
+    const { data } = await supabase.auth.getSession()
+    const res = await fetch('/api/deriv-link', { method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token ?? ''}` }, body: body ? JSON.stringify(body) : undefined })
+    return { ok: res.ok, out: (await res.json().catch(() => ({}))) as { error?: string; status?: string; note?: string } }
+  }
+  const save = async (e: FormEvent) => {
+    e.preventDefault()
+    setBusy(true); setMsg('')
+    const { ok, out } = await call('POST', { token: key })
+    setBusy(false); setBad(!ok)
+    if (ok) { setKey(''); setMsg(out.status === 'verified' ? 'Connected.' : `Saved, but not checked yet. ${out.note ?? ''}`); load() } else setMsg(out.error ?? 'Could not save the key.')
+  }
+  const remove = async () => { setBusy(true); await call('DELETE'); setBusy(false); setMsg('Key removed.'); setBad(false); load() }
+  if (link === undefined) return null
+  if (link) return (
+    <div className="card">
+      <div className="row"><h3 style={{ margin: 0 }}>Deriv account</h3><span className={link.status === 'verified' ? 'ok' : 'mu'}>{link.status === 'verified' ? 'Connected' : 'Saved, not checked'}</span></div>
+      <div className="row ml"><span className="mu">Account</span><b>{link.loginid ?? 'not read yet'}{link.is_virtual != null && <span className="tg">{link.is_virtual ? 'Demo' : 'Real'}</span>}</b></div>
+      <p className="mu">Your key is saved encrypted on our server and is never shown again. The Deriv trading engine is the next step, so the bot does not place trades yet.</p>
+      {msg && <p className={bad ? 'err' : 'mu'}>{msg}</p>}
+      <button className="btn sm" disabled={busy} onClick={remove}>Remove key</button>
+    </div>
+  )
+  return (
+    <form className="card" onSubmit={save}>
+      <h3>Connect your Deriv account</h3>
+      <p className="mu">Paste your Deriv API key so the bot can trade for you.</p>
+      <ol className="mu">
+        <li>In Deriv, open Settings, then API token.</li>
+        <li>Tick only <b>Read</b> and <b>Trade</b>. Never Payments or Admin.</li>
+        <li>Start with a <b>demo</b> account.</li>
+        <li>Copy the token and paste it here.</li>
+      </ol>
+      <label className="f">Deriv API key<input type="password" value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" required /></label>
+      {msg && <p className={bad ? 'err' : 'mu'}>{msg}</p>}
+      <p style={{ marginBottom: 0 }}><button className="btn p" type="submit" disabled={busy}>{busy ? 'Saving...' : 'Save key'}</button></p>
+    </form>
+  )
 }
 
 export default function Bot({ uid, botAccess, goPlan }: { uid: string; botAccess: boolean; goPlan: () => void }) {
@@ -49,6 +98,7 @@ export default function Bot({ uid, botAccess, goPlan }: { uid: string; botAccess
   const floating = acct?.floating ?? 0
   return (
     <>
+      <DerivLink uid={uid} />
       <div className="card">
         <div className="row">
           <div>

@@ -27,7 +27,7 @@ export default function Landing({ onAuth }: { onAuth: (m: 'in' | 'up') => void }
         <div className="card"><h3>{PLANS.signals.name}</h3><div className="price">{naira(PLANS.signals.price)}<small> / month</small></div>
           <ul><li>Live signals on the site</li><li>Timeframe, entry, stop and two targets</li><li>Every signal's result tracked</li></ul><button className="btn p" onClick={() => onAuth('up')}>Get access</button></div>
         <div className="card"><h3>{PLANS.auto.name}</h3><div className="price">{naira(PLANS.auto.price)}<small> / month</small></div>
-          <ul><li>Everything in Signals</li><li>Your own bot, trading your own MT5 account</li><li>Basket stop, loss limits and a kill switch</li><li>Runs on your Windows PC with MT5</li></ul><button className="btn p" onClick={() => onAuth('up')}>Get access</button></div></div></section>
+          <ul><li>Everything in Signals</li><li>Auto-trading on your own account</li><li>Connect it with your Deriv API key</li><li>Loss limits and a kill switch</li></ul><button className="btn p" onClick={() => onAuth('up')}>Get access</button></div></div></section>
       <div className="foot">Trading carries risk and you can lose money. Signals are not financial advice, and past results do not guarantee future ones.</div>
     </main>
   )

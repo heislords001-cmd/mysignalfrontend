@@ -42,6 +42,14 @@ export default function Home({ admin, access, goPlan }: { admin: boolean; access
             </button>
           )}
         </div>
+        {admin && bot && (
+          <div className="ml">
+            <div className="row"><span className="mu">Strategies passed</span><b>{bot.approved ?? '-'} of {bot.combos ?? '-'}</b></div>
+            <div className="row" style={{ marginTop: 6 }}><span className="mu">Signals today</span><b>{t.length}{t.some((s) => s.approved === false) ? ` (${t.filter((s) => s.approved === false).length} untested)` : ''}</b></div>
+            {bot.note && <p className="mu">{bot.note}</p>}
+            {!bot.running && <p className="mu">The scanner is paused. Press Start scanner, or runs on GitHub will stop straight away.</p>}
+          </div>
+        )}
         {bot?.last_error && admin && <p className="err">Last error: {bot.last_error}</p>}
         {err && <p className="err">{err}</p>}
       </div>
