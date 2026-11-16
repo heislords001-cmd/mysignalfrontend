@@ -20,11 +20,17 @@ export default function Home({ uid, admin, access, goPlan }: { uid: string; admi
   useEffect(() => { load(); const t = setInterval(load, 15000); return () => clearInterval(t) }, [load])
 
   const [busy, setBusy] = useState(false)
+  const [mine, setMine] = useState<boolean | undefined>(undefined)
+  useEffect(() => {
+    supabase.from('user_settings').select('data').eq('user_id', uid).maybeSingle().then(({ data }) => {
+      setMine(((data?.data ?? {}) as Record<string, unknown>).signals_on === true)
+    })
+  }, [uid, busy])
   const toggle = async () => {
     if (!bot) return
     setBusy(true); setErr('')
     const { data } = await supabase.auth.getSession()
-    const action = bot.running ? 'stop' : 'start'
+    const action = mine ? 'receive_off' : 'receive_on'
     const res = await fetch('/api/scanner-control', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token ?? ''}` },
@@ -45,12 +51,12 @@ export default function Home({ uid, admin, access, goPlan }: { uid: string; admi
       <div className="card">
         <div className="row">
           <div>
-            <b><span className={`dot ${online ? '' : 'off'}`} />{bot?.running ? 'Scanner running' : 'Scanner paused'}</b>
-            <div className="mu">{online ? `Last check ${ago(bot?.heartbeat ?? null)}` : 'Scanner worker offline'}{bot?.running ? ' · runs until you press Stop' : ''}</div>
+            <b><span className={`dot ${mine ? '' : 'off'}`} />{mine ? 'Receiving signals' : 'Signals off for you'}</b>
+            <div className="mu">{online ? `Last check ${ago(bot?.heartbeat ?? null)}` : 'Scanner worker offline'}{bot?.running ? ' · scanner running' : ' · scanner off'}</div>
           </div>
-          {admin && bot && (
-            <button className={`btn ${bot.running ? 'stop' : 'start'}`} onClick={toggle} disabled={busy}>
-              <Icon n={bot.running ? 'stop' : 'play'} />{bot.running ? 'Stop scanner' : 'Start scanner'}
+          {bot && mine !== undefined && (
+            <button className={`btn ${mine ? 'stop' : 'start'}`} onClick={toggle} disabled={busy}>
+              <Icon n={mine ? 'stop' : 'play'} />{mine ? 'Stop scanner' : 'Start scanner'}
             </button>
           )}
         </div>
@@ -73,7 +79,7 @@ export default function Home({ uid, admin, access, goPlan }: { uid: string; admi
       {bot?.running && <EquityChart uid={uid} />}
       <div className="card"><h2>Latest signals</h2>
         {sigs.length === 0 && <p className="mu">No signals yet. They appear when an approved strategy finds a setup.</p>}
-        <div className="cards">{sigs.slice(0, 5).map((s) => <SignalCard key={s.id} s={s} />)}</div>
+        {mine ? <div className="cards">{sigs.slice(0, 5).map((s) => <SignalCard key={s.id} s={s} />)}</div> : <p className="mu">Signals are off for your account. Press Start scanner to receive them.</p>}
       </div>
     </>
   )

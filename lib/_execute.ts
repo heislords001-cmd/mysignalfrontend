@@ -68,7 +68,7 @@ export async function executeSignal(s: Signal): Promise<Tally> {
   const eligible = m.ids.filter((id) => {
     const admin = m.P.get(id)?.role === 'admin'
     const mayTrade = approved || (admin && m.U.get(id)?.data?.trade_untested === true)      // untested signals: the admin's own demo only
-    return hasPlan(m, id) && mayTrade && m.L.has(id) && m.K.has(id)
+    return hasPlan(m, id) && mayTrade && m.L.has(id) && m.K.has(id) && m.U.get(id)?.data?.signals_on !== false
   })
   return runOrder({ kind: 'signal', key: `signal:${s.id}`, signalId: s.id, symbol: s.symbol, side: s.side as 'buy' | 'sell', entry: Number(s.entry), sl: Number(s.sl), tp1: Number(s.tp1) }, eligible, m)
 }
@@ -78,7 +78,7 @@ export async function executeScalp(mk: Market): Promise<Tally> {
   if (!plan.ok) return { ...zero(), note: plan.reason }
   const m = await loadMembers()
   if (!m) return { ...zero(), note: 'no member has the bot on' }
-  const eligible = m.ids.filter((id) => hasPlan(m, id) && m.L.has(id) && m.K.has(id) && m.U.get(id)?.data?.scalp_enabled === true)
+  const eligible = m.ids.filter((id) => hasPlan(m, id) && m.L.has(id) && m.K.has(id) && m.U.get(id)?.data?.scalp_enabled === true && m.U.get(id)?.data?.signals_on !== false)
   return runOrder({ kind: 'scalp', key: `scalp:${mk.symbol}:${mk.updated_at}`, signalId: null, symbol: mk.symbol, side: plan.side, entry: plan.entry, sl: plan.sl, tp1: plan.tp1 }, eligible, m)
 }
 
