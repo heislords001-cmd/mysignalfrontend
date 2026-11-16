@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from './supabase'
-import { Icon, Locked, SignalRow, ago } from './ui'
+import { Icon, Locked, SignalCard, ago } from './ui'
 import type { ScannerState, Signal } from './types'
 
 export default function Home({ admin, access, goPlan }: { admin: boolean; access: boolean; goPlan: () => void }) {
@@ -27,7 +27,7 @@ export default function Home({ admin, access, goPlan }: { admin: boolean; access
   if (!access) return <Locked go={goPlan} />
   const today = new Date().toISOString().slice(0, 10)
   const t = sigs.filter((s) => s.created_at.startsWith(today))
-  const online = !!bot?.heartbeat && Date.now() - new Date(bot.heartbeat).getTime() < 60000
+  const online = !!bot?.heartbeat && Date.now() - new Date(bot.heartbeat).getTime() < 1200000
   return (
     <>
       <div className="card">
@@ -52,7 +52,7 @@ export default function Home({ admin, access, goPlan }: { admin: boolean; access
       </div>
       <div className="card"><h2>Latest signals</h2>
         {sigs.length === 0 && <p className="mu">No signals yet. They appear when an approved strategy finds a setup.</p>}
-        {sigs.slice(0, 5).map((s) => <SignalRow key={s.id} s={s} />)}
+        <div className="cards">{sigs.slice(0, 5).map((s) => <SignalCard key={s.id} s={s} />)}</div>
       </div>
     </>
   )

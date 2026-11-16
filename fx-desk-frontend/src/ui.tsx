@@ -24,29 +24,37 @@ const left = (iso: string) => {
   const m = Math.round((new Date(iso).getTime() - Date.now()) / 60000)
   return m <= 0 ? null : m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`
 }
-export function SignalRow({ s }: { s: Signal }) {
-  const sl = s.sl ?? s.runner_sl, tp1 = s.tp1 ?? s.scalp_tp
-  const valid = s.expires_at && !s.outcome ? left(s.expires_at) : null
-  const done = s.outcome === 'tp' ? `Hit TP1 · +${(s.result_r ?? 0).toFixed(1)}R` : s.outcome === 'sl' ? 'Stopped out · -1R'
-    : s.outcome === 'expired' ? `Expired · ${(s.result_r ?? 0) >= 0 ? '+' : ''}${(s.result_r ?? 0).toFixed(1)}R` : null
-  return (
-    <div className="sig">
-      <span className={`tag ${s.side === 'buy' ? 'b' : 's'}`}>{s.side === 'buy' ? 'Buy' : 'Sell'}</span>
-      <b>{s.symbol}{s.timeframe && <span className="tg">{s.timeframe}</span>}</b><span className="mu">{ago(s.created_at)}</span>
-      <div className="nums"><span>Entry <b>{s.entry}</b></span>{sl != null && <span>SL <b>{sl}</b></span>}{tp1 != null && <span>TP1 <b>{tp1}</b></span>}{s.tp2 != null && <span>TP2 <b>{s.tp2}</b></span>}</div>
-      {(s.strategy || valid || done) && <div className="mu" style={{ gridColumn: '1 / -1' }}>
-        {s.strategy && `${STRAT[s.strategy] ?? s.strategy}${s.htf ? ` · ${s.htf} trend` : ''}`}
-        {valid && ` · valid for ${valid}`}{!valid && !done && s.expires_at && ' · entry window passed'}
-        {s.max_hold_min ? ` · hold up to ${Math.round(s.max_hold_min / 60)}h` : ''}
-      </div>}
-      {done && <div className={s.outcome === 'tp' ? 'ok' : 'neg'} style={{ gridColumn: '1 / -1', fontSize: 13 }}>{done}</div>}
-      {s.win_rate != null && s.pf != null && <div className="mu" style={{ gridColumn: '1 / -1' }}>Backtest: {Math.round(s.win_rate * 100)}% wins · profit factor {s.pf} · {s.bt_trades} trades</div>}
-    </div>
-  )
-}
 export function Locked({ go, title = 'Signals need an active plan', text = 'Get access to see live signals as they appear.', cta = 'Get access' }: { go: () => void; title?: string; text?: string; cta?: string }) {
   return (
     <div className="card lock"><Icon n="lock" /><h3 style={{ margin: '8px 0' }}>{title}</h3>
       <p className="mu">{text}</p><button className="btn p" onClick={go}>{cta}</button></div>
+  )
+}
+
+export function SignalCard({ s }: { s: Signal }) {
+  const sl = s.sl ?? s.runner_sl, tp1 = s.tp1 ?? s.scalp_tp
+  const live = !s.outcome && !!s.expires_at && new Date(s.expires_at).getTime() > Date.now()
+  const r = s.result_r ?? 0
+  const status = s.outcome === 'tp' ? { c: 'win', t: 'Win' } : s.outcome === 'sl' ? { c: 'loss', t: 'Loss' }
+    : s.outcome === 'expired' ? { c: 'open', t: 'Ended' } : live ? { c: 'live', t: 'Live' } : { c: 'open', t: 'Open' }
+  const hold = s.max_hold_min ? `hold up to ${Math.round(s.max_hold_min / 60)}h` : ''
+  const note = s.strategy ? `${STRAT[s.strategy] ?? s.strategy}${s.htf ? ` · ${s.htf} trend agrees` : ''}` : ''
+  return (
+    <div className="scard">
+      <div className="top">
+        <span className="sym">{s.symbol}</span>
+        <span className={`badge ${s.side}`}>{s.side}</span>
+        <span className={`badge ${status.c}`}>{status.c === 'live' && <span className="dot2" />}{status.t}</span>
+        {s.outcome && <span className={r >= 0 ? 'ok' : 'neg'} style={{ marginLeft: 'auto', fontFamily: 'var(--mono)', fontSize: 13 }}>{r >= 0 ? '+' : ''}{r.toFixed(1)}R</span>}
+      </div>
+      {s.timeframe && <div className="sub">{s.symbol} · {s.timeframe}{hold && ` · ${hold}`}</div>}
+      <div className="stats3">
+        <div><div className="lab">Entry</div><div className="val">{s.entry}</div></div>
+        <div><div className="lab">Stop</div><div className="val">{sl ?? '-'}</div></div>
+        <div><div className="lab">Targets</div><div className="val">{tp1 ?? 'Not given'}{s.tp2 != null && <small>then {s.tp2}</small>}</div></div>
+      </div>
+      {s.win_rate != null && s.pf != null && <div className="sub" style={{ marginTop: 0 }}>Backtest: {Math.round(s.win_rate * 100)}% wins · profit factor {s.pf} · {s.bt_trades} trades</div>}
+      <div className="foot2"><span>{note}{live && s.expires_at ? ` · valid for ${left(s.expires_at)}` : ''}</span><span>{ago(s.created_at)}</span></div>
+    </div>
   )
 }

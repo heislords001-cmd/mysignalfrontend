@@ -134,3 +134,19 @@ input[type=text],input[type=number],input[type=email],input[type=password]{backg
 .wrap, main, .page { max-width:100%; }
 
 .warn { font-size:12px; color:var(--sell); line-height:1.4; margin-top:6px; }
+
+/* ---- phone width fix: nothing may be wider than the screen ---- */
+html, body, #root { width:100%; max-width:100%; overflow-x:hidden; }
+*, *::before, *::after { box-sizing:border-box; }
+#root > *, .app, main, .shell, .page, .wrap { min-width:0; max-width:100%; }
+.stats, .stats.c2, .stats.c3, .stats3, .grid2, .grid3, .grid, .form, .cards, .seg, .pills, .sig-grid {
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); min-width:0; max-width:100%;
+}
+.stats.c3, .stats3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.stats.c2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.card, .scard, .row, .top, .meta, .foot2, .block, .hist, .read-card, .chart-tab { min-width:0; max-width:100%; }
+.row > *, .top > *, .foot2 > * { min-width:0; }
+.pill { min-width:0; }
+.pill .pv { font-size:12px; }
+.scard .top { flex-wrap:wrap; }
+img, svg, video { max-width:100%; height:auto; }

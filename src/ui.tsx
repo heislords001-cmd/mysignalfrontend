@@ -100,10 +100,9 @@ export function SignalCard({ s }: { s: Signal }) {
         <span className={`badge ${s.side}`}>{s.side}</span>
         <span className={`badge ${status.c}`}>{status.c === 'live' && <span className="dot2" />}{status.t}</span>
         {s.approved === false && <span className="badge test">Untested</span>}
-        <span className="right">
-          {s.outcome
-            ? <span className={r >= 0 ? 'ok' : 'neg'} style={{ fontFamily: 'var(--mono)', fontSize: 13 }}>{r >= 0 ? '+' : ''}{r.toFixed(1)}R</span>
-            : <CopyButton text={signalText(s)} />}
+        <span className="right" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {s.outcome && <span className={r >= 0 ? 'ok' : 'neg'} style={{ fontFamily: 'var(--mono)', fontSize: 13 }}>{r >= 0 ? '+' : ''}{r.toFixed(1)}R</span>}
+          <CopyButton text={signalText(s)} />
         </span>
       </div>
       {meta && <div className="meta">{meta}</div>}

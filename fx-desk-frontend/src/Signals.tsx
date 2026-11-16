@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
-import { Locked, SignalRow, STRAT, ago } from './ui'
+import { Locked, SignalCard, STRAT, ago } from './ui'
 import type { Signal, StratStat } from './types'
+
+type Tab = 'live' | 'open' | 'closed'
+const isLive = (s: Signal) => !s.outcome && !!s.expires_at && new Date(s.expires_at).getTime() > Date.now()
+const IN: Record<Tab, (s: Signal) => boolean> = { live: isLive, open: (s) => !s.outcome && !isLive(s), closed: (s) => !!s.outcome }
 
 export default function Signals({ access, goPlan }: { access: boolean; goPlan: () => void }) {
   const [sigs, setSigs] = useState<Signal[]>([])
   const [stats, setStats] = useState<StratStat[]>([])
-  const [side, setSide] = useState<'all' | 'buy' | 'sell'>('all')
+  const [tab, setTab] = useState<Tab>('live')
   const [tf, setTf] = useState('all')
   const [info, setInfo] = useState(false)
   useEffect(() => {
@@ -19,28 +23,32 @@ export default function Signals({ access, goPlan }: { access: boolean; goPlan: (
   }, [access])
   if (!access) return <Locked go={goPlan} />
 
-  const list = sigs.filter((s) => (side === 'all' || s.side === side) && (tf === 'all' || s.timeframe === tf))
+  const byTf = sigs.filter((s) => tf === 'all' || s.timeframe === tf)
+  const list = byTf.filter(IN[tab])
+  const live = sigs.filter(isLive).length
   const month = Date.now() - 30 * 86400000
   const done = sigs.filter((s) => s.outcome && s.result_r != null && new Date(s.created_at).getTime() > month)
   const wins = done.filter((s) => s.outcome === 'tp').length
   const avgR = done.length ? done.reduce((a, s) => a + (s.result_r ?? 0), 0) / done.length : 0
   const approved = stats.filter((s) => s.enabled)
+  const empty = { live: 'No live signals right now. New ones appear when a setup forms.', open: 'Nothing open.', closed: 'No finished signals yet. Results appear once signals hit their target or stop.' }
   return (
     <>
-      <div className="seg">
-        {['all', 'M5', 'M15', 'H1'].map((k) => <button key={k} className={`btn sm ${tf === k ? 'on' : ''}`} onClick={() => setTf(k)}>{k === 'all' ? 'All timeframes' : k}</button>)}
-        {(['all', 'buy', 'sell'] as const).map((k) => <button key={k} className={`btn sm ${side === k ? 'on' : ''}`} onClick={() => setSide(k)}>{k === 'all' ? 'Buy + Sell' : k === 'buy' ? 'Buy' : 'Sell'}</button>)}
+      <div className="shead"><h1>Signals</h1><div className="mu">{live} live now</div></div>
+      <div className="seg2">
+        {(['live', 'open', 'closed'] as Tab[]).map((k) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{k === 'live' ? 'Live' : k === 'open' ? 'Open' : 'Closed'} ({byTf.filter(IN[k]).length})</button>)}
       </div>
-      <div className="card">
-        {list.length === 0 && <p className="mu">Nothing here yet.</p>}
-        {list.map((s) => <SignalRow key={s.id} s={s} />)}
+      <div className="seg">{['all', 'M5', 'M15', 'H1'].map((k) => <button key={k} className={`btn sm ${tf === k ? 'on' : ''}`} onClick={() => setTf(k)}>{k === 'all' ? 'All timeframes' : k}</button>)}</div>
+      <div className="cards">
+        {list.length === 0 && <div className="card"><span className="mu">{empty[tab]}</span></div>}
+        {list.map((s) => <SignalCard key={s.id} s={s} />)}
       </div>
       <div className="card"><h3>Live results, last 30 days</h3>
-        {done.length === 0 ? <p className="mu">No finished signals yet. Results appear once signals hit their target or stop.</p> : <>
+        {done.length === 0 ? <p className="mu">No finished signals yet.</p> : <>
           <div className="stats"><div className="stat"><span className="mu">Finished</span><b>{done.length}</b></div>
-            <div className="stat"><span className="mu">Hit target</span><b>{Math.round((wins / done.length) * 100)}%</b></div>
+            <div className="stat"><span className="mu">Wins</span><b>{Math.round((wins / done.length) * 100)}%</b></div>
             <div className="stat"><span className="mu">Average</span><b className={avgR >= 0 ? 'ok' : 'neg'}>{avgR >= 0 ? '+' : ''}{avgR.toFixed(2)}R</b></div></div>
-          <p className="mu">R is your risk on a trade: -1R is a full stop-loss, +1.5R is TP1. Measured on the signals above, before your broker's spread.</p></>}
+          <p className="mu">R is your risk on a trade: -1R is a full stop-loss, +1.5R is TP1. Measured on these signals, before your broker's spread.</p></>}
       </div>
       <div className="card"><div className="row"><h3 style={{ margin: 0 }}>How signals are picked</h3><button className="btn sm" onClick={() => setInfo(!info)}>{info ? 'Hide' : 'Show'}</button></div>
         {info && <>

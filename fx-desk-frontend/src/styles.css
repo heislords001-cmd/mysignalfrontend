@@ -33,3 +33,17 @@ input[type=text],input[type=number],input[type=email],input[type=password]{backg
 .sw input::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--tx)}.sw input:checked::after{left:20px;background:var(--ink)}
 .pg{height:6px;background:var(--rs);border-radius:3px;overflow:hidden;margin:6px 0 14px}.pg span{display:block;height:100%;background:var(--ac)}.pg.hot span{background:var(--sell)}
 .ml{margin-top:12px}.form{display:grid;gap:12px;grid-template-columns:1fr 1fr}.login{max-width:380px;margin:12vh auto 0;padding:0 18px;display:grid;gap:14px}.err{color:var(--sell);font-size:13px}.lock{text-align:center;padding:28px 18px}
+
+.shead h1{font-size:26px;margin:0;letter-spacing:-.01em}.shead .mu{margin-top:2px}
+.seg2{display:grid;grid-template-columns:repeat(3,1fr);background:var(--sf);border:1px solid var(--ln);border-radius:14px;padding:4px;gap:4px}
+.seg2 button{background:none;border:0;border-radius:10px;padding:10px 6px;color:var(--mu);font-weight:500;cursor:pointer}.seg2 button.on{background:var(--rs);color:var(--tx)}
+.cards{display:grid;gap:12px}
+.scard{background:var(--sf);border:1px solid var(--ln);border-radius:16px;padding:16px;display:grid;gap:12px}
+.scard .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.scard .sym{font-weight:700;font-size:17px}.scard .sub{color:var(--mu);font-size:13px;margin-top:-6px}
+.badge{font-size:11px;font-weight:700;letter-spacing:.05em;padding:3px 8px;border-radius:6px;text-transform:uppercase}
+.badge.buy{background:#12301f;color:var(--buy)}.badge.sell{background:#34171a;color:var(--sell)}.badge.live{background:var(--rs);color:var(--buy)}
+.badge.win{background:var(--buy);color:#04170c}.badge.loss{background:var(--sell);color:#fff}.badge.open{background:var(--rs);color:var(--mu)}
+.stats3{display:grid;grid-template-columns:1fr 1fr 1.5fr;gap:12px;border-top:1px solid var(--ln);padding-top:12px}
+.lab{font-size:11px;letter-spacing:.12em;color:var(--mu);text-transform:uppercase}.val{font:500 15px var(--mono);margin-top:2px}.val small{display:block;font-size:12px;color:var(--mu);font-weight:400}
+.foot2{display:flex;justify-content:space-between;gap:10px;color:var(--mu);font-size:13px}
+.dot2{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--buy);margin-right:5px}
