@@ -122,3 +122,15 @@ input[type=text],input[type=number],input[type=email],input[type=password]{backg
 .pills.tight .pill .pv { font-size:12px; }
 .scard .note { font-size:12px; color:var(--mu); margin-top:6px; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .scard .foot2 { display:flex; justify-content:space-between; gap:8px; font-size:11px; color:var(--mu); margin-top:8px; }
+
+/* keep every card inside the phone width: no hidden sideways overflow */
+.cards { display:flex; flex-direction:column; gap:10px; min-width:0; width:100%; }
+.scard { min-width:0; width:100%; }
+.scard .top { flex-wrap:wrap; row-gap:6px; }
+.scard .top .right { margin-left:auto; }
+.pills.tight { min-width:0; width:100%; }
+.pills.tight .pill { min-width:0; overflow:hidden; }
+.pills.tight .pill .pv { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+.wrap, main, .page { max-width:100%; }
+
+.warn { font-size:12px; color:var(--sell); line-height:1.4; margin-top:6px; }

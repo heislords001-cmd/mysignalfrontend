@@ -6,6 +6,7 @@ export type Signal = {
   approved?: boolean
   ai_note?: string | null
   agreement?: string | null
+  risk_warning?: string | null
   scalp_tp: number | null; runner_sl: number | null   // older signals
 }
 export type StratStat = { symbol: string; timeframe: string; strategy: string; enabled: boolean; trades: number; win_rate: number; pf: number; test_pf: number; test_n: number; updated_at: string }

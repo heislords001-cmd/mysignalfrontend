@@ -53,6 +53,7 @@ export function signalText(s: Signal): string {
   ]
   if (s.tp2 != null) lines.push(`TAKE PROFIT 2: ${s.tp2}`)
   if (s.agreement) lines.push(`Timeframes: ${s.agreement}`)
+  if (s.risk_warning) lines.push(`Warning: ${s.risk_warning}`)
   if (s.approved === false) lines.push('Status: untested signal')
   return lines.join('\n')
 }
@@ -112,6 +113,7 @@ export function SignalCard({ s }: { s: Signal }) {
         {tp1 != null && <div className="pill tp"><span className="pl">TP1</span><span className="pv">{tp1}</span></div>}
         {s.tp2 != null && <div className="pill tp"><span className="pl">TP2</span><span className="pv">{s.tp2}</span></div>}
       </div>
+      {s.risk_warning && <div className="warn">⚠ {s.risk_warning}</div>}
       {s.agreement && <div className="meta">Timeframes: {s.agreement}</div>}
       {s.ai_note && <div className="note">{s.ai_note}</div>}
       <div className="foot2">
