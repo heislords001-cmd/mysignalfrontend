@@ -154,3 +154,32 @@ img, svg, video { max-width:100%; height:auto; }
 /* signal levels: show the full price on one line, never truncated */
 .pills.tight .pill { flex:1 1 0; padding:6px 6px; overflow:visible; }
 .pills.tight .pill .pv { font-size:12px; white-space:nowrap; overflow:visible; text-overflow:clip; max-width:none; letter-spacing:-0.01em; }
+
+/* upcoming news panel */
+.news-row { display:flex; gap:10px; align-items:flex-start; border-top:1px solid var(--ln); padding:10px 0; }
+.news-dot { width:8px; height:8px; border-radius:50%; margin-top:6px; flex:none; }
+.news-dot.hi { background:var(--sell); }
+.news-dot.med { background:var(--brown); }
+.news-title { font-size:13px; line-height:1.4; overflow-wrap:anywhere; }
+
+/* four tabs: a dot shows a tab has a second view (hold the tab to switch) */
+.tabs button { position:relative; -webkit-touch-callout:none; user-select:none; }
+.tabs .tab-dot { position:absolute; top:6px; right:calc(50% - 18px); width:6px; height:6px; border-radius:50%; background:var(--brown); }
+
+/* ---- bottom nav: floating pill, icon over label, lighter pill on the selected tab ---- */
+.app { padding-bottom: 112px; }
+.tabs {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 14px;
+  width: min(360px, calc(100% - 24px)); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px; padding: 6px; border-radius: 999px; background: var(--sf); border: 1px solid var(--ln); z-index: 50;
+}
+.tabs button {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  min-width: 0; padding: 9px 4px; border: 0; border-radius: 999px; background: transparent;
+  color: var(--mu); font-size: 11px; font-weight: 600; letter-spacing: .01em;
+  transition: background .2s ease, color .2s ease, transform .12s ease;
+}
+.tabs button svg { width: 22px; height: 22px; }
+.tabs button:active { transform: scale(.94); }
+.tabs button.on { background: var(--rs); color: var(--tx); box-shadow: inset 0 0 0 1px var(--ln); }
+.tabs .tab-dot { top: 8px; right: calc(50% - 16px); }

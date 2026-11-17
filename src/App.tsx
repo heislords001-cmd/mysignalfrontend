@@ -1,5 +1,6 @@
+import News from './News'
 import ChartTab from './ChartTab'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { configured, supabase } from './supabase'
 import Landing from './Landing'
@@ -12,12 +13,21 @@ import { Brand, Icon, ThemeToggle } from './ui'
 import type { IconName } from './ui'
 import type { Profile as P, Sub } from './types'
 
-type Tab = 'home' | 'sig' | 'chart' | 'bot' | 'pro'
+type Tab = 'home' | 'chart' | 'bot' | 'pro'
+// Two views share one tab. Hold the tab to switch; a dot on the tab shows it has a second view.
+type Pane = 'a' | 'b'
+const SECOND: Partial<Record<Tab, { a: [IconName, string]; b: [IconName, string] }>> = {
+  home: { a: ['home', 'Home'], b: ['bars', 'Signals'] },
+  chart: { a: ['camera', 'Chart'], b: ['news', 'News'] },
+}
 
 function Shell({ session }: { session: Session }) {
   const [profile, setProfile] = useState<P | null>(null)
   const [sub, setSub] = useState<Sub | null>(null)
   const [tab, setTab] = useState<Tab>('home')
+  const [pane, setPane] = useState<Record<string, Pane>>({ home: 'a', chart: 'a' })
+  const holdTimer = useRef<number | null>(null)
+  const held = useRef(false)
   const refresh = useCallback(async () => {
     const [p, s] = await Promise.all([
       supabase.from('profiles').select('id,email,role').eq('id', session.user.id).maybeSingle(),
@@ -33,18 +43,34 @@ function Shell({ session }: { session: Session }) {
   const active = !!sub && new Date(sub.expires_at) > new Date()
   const access = admin || active
   const botAccess = admin || (active && sub?.plan === 'auto')
-  const tabs: [Tab, IconName, string][] = [['home', 'home', 'Home'], ['sig', 'bars', 'Signals'], ['chart', 'camera', 'Chart'], ['bot', 'bot', 'Bot'], ['pro', 'user', 'Profile']]
+  const tabs: [Tab, IconName, string][] = [['home', 'home', 'Home'], ['chart', 'camera', 'Chart'], ['bot', 'bot', 'Bot'], ['pro', 'user', 'Profile']]
+  const shown = (k: Tab): [IconName, string] => {
+    const s = SECOND[k]
+    if (!s) { const t = tabs.find((x) => x[0] === k)!; return [t[1], t[2]] }
+    return s[pane[k] === 'b' ? 'b' : 'a']
+  }
+  const press = (k: Tab) => {
+    held.current = false
+    if (!SECOND[k]) return
+    holdTimer.current = window.setTimeout(() => {
+      held.current = true
+      if (navigator.vibrate) navigator.vibrate(12)
+      setPane((p) => ({ ...p, [k]: p[k] === 'b' ? 'a' : 'b' }))
+      setTab(k)
+    }, 500)
+  }
+  const release = () => { if (holdTimer.current) { clearTimeout(holdTimer.current); holdTimer.current = null } }
+  const tap = (k: Tab) => { if (held.current) { held.current = false; return } setTab(k) }
   return (
     <>
       <div className="app">
         <div className="bar"><Brand /><div className="row" style={{ gap: 8 }}><ThemeToggle /><button className="btn sm" onClick={() => supabase.auth.signOut()}><Icon n="out" />Sign out</button></div></div>
-        {tab === 'home' && <Home uid={profile.id} admin={admin} access={access} goPlan={() => setTab('pro')} />}
-        {tab === 'sig' && <Signals access={access} goPlan={() => setTab('pro')} />}
-        {tab === 'chart' && <ChartTab uid={profile.id} />}
+        {tab === 'home' && (pane.home === 'b' ? <Signals access={access} goPlan={() => setTab('pro')} /> : <Home uid={profile.id} admin={admin} access={access} goPlan={() => setTab('pro')} />)}
+        {tab === 'chart' && (pane.chart === 'b' ? <div className="page"><News /></div> : <ChartTab uid={profile.id} />)}
         {tab === 'bot' && <Bot uid={profile.id} admin={admin} botAccess={botAccess} goPlan={() => setTab('pro')} />}
         {tab === 'pro' && <Profile profile={profile} sub={sub} botAccess={botAccess} refresh={refresh} />}
       </div>
-      <nav className="tabs">{tabs.map(([k, ic, l]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}><Icon n={ic} />{l}</button>)}</nav>
+      <nav className="tabs">{tabs.map(([k]) => { const [ic, l] = shown(k); return (<button key={k} className={tab === k ? 'on' : ''} onPointerDown={() => press(k)} onPointerUp={release} onPointerLeave={release} onPointerCancel={release} onContextMenu={(e) => e.preventDefault()} onClick={() => tap(k)}>{SECOND[k] && <span className="tab-dot" />}<Icon n={ic} />{l}</button>) })}</nav>
     </>
   )
 }

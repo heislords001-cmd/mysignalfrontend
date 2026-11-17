@@ -1,14 +1,22 @@
 import type { ReactNode } from 'react'
 import type { Signal } from './types'
+import { useTheme } from './theme'
 
-export type IconName = 'logo' | 'home' | 'bars' | 'bot' | 'user' | 'play' | 'stop' | 'out' | 'lock'
+export type IconName = 'logo' | 'home' | 'bars' | 'bot' | 'user' | 'play' | 'stop' | 'out' | 'lock' | 'sun' | 'moon'
 const P: Record<IconName, ReactNode> = {
   logo: <path d="M3 17l5-6 4 3 8-9M15 5h5v5" />, home: <path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z" />, bars: <path d="M5 20V10M12 20V4M19 20v-7" />,
   bot: <path d="M12 3v3M5 7h14v11H5zM9.5 12h.01M14.5 12h.01" />, user: <path d="M12 12a4 4 0 100-8 4 4 0 000 8zM4 21c0-4 4-6 8-6s8 2 8 6" />,
   play: <path d="M7 5l12 7-12 7z" />, stop: <rect x="6" y="6" width="12" height="12" rx="1" />, out: <path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10" />,
+  sun: <><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></>,
+  moon: <path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" />,
   lock: <><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 018 0v3" /></>,
 }
 export const Icon = ({ n }: { n: IconName }) => <i><svg viewBox="0 0 24 24">{P[n]}</svg></i>
+export function ThemeToggle() {
+  const { theme, toggle } = useTheme()
+  const label = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
+  return <button className="btn sm iconbtn" onClick={toggle} aria-label={label} title={label}><Icon n={theme === 'dark' ? 'sun' : 'moon'} /></button>
+}
 export const Brand = () => <div className="brand"><span className="mk"><Icon n="logo" /></span>FX Desk</div>
 
 export const ago = (iso: string | null) => {
@@ -45,7 +53,7 @@ export function SignalCard({ s }: { s: Signal }) {
         <span className="sym">{s.symbol}</span>
         <span className={`badge ${s.side}`}>{s.side}</span>
         <span className={`badge ${status.c}`}>{status.c === 'live' && <span className="dot2" />}{status.t}</span>
-        {s.approved === false && <span className="badge open">Untested</span>}
+        {s.approved === false && <span className="badge test">Untested</span>}
         {s.outcome && <span className={r >= 0 ? 'ok' : 'neg'} style={{ marginLeft: 'auto', fontFamily: 'var(--mono)', fontSize: 13 }}>{r >= 0 ? '+' : ''}{r.toFixed(1)}R</span>}
       </div>
       {s.timeframe && <div className="sub">{s.symbol} · {s.timeframe}{hold && ` · ${hold}`}</div>}

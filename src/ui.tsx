@@ -2,8 +2,9 @@ import { useState, type ReactNode } from 'react'
 import type { Signal } from './types'
 import { useTheme } from './theme'
 
-export type IconName = 'logo' | 'home' | 'bars' | 'bot' | 'user' | 'play' | 'stop' | 'out' | 'lock' | 'sun' | 'moon' | 'camera'
+export type IconName = 'logo' | 'home' | 'bars' | 'bot' | 'user' | 'play' | 'stop' | 'out' | 'lock' | 'sun' | 'moon' | 'camera' | 'news'
 const P: Record<IconName, ReactNode> = {
+  news: <><rect x="4" y="5" width="16" height="14" rx="2" /><path d="M8 9h8M8 13h8M8 17h5" /></>,
   camera: <><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></>,
   logo: <path d="M3 17l5-6 4 3 8-9M15 5h5v5" />, home: <path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z" />, bars: <path d="M5 20V10M12 20V4M19 20v-7" />,
   bot: <path d="M12 3v3M5 7h14v11H5zM9.5 12h.01M14.5 12h.01" />, user: <path d="M12 12a4 4 0 100-8 4 4 0 000 8zM4 21c0-4 4-6 8-6s8 2 8 6" />,

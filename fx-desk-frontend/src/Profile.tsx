@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { supabase } from './supabase'
-import { day } from './ui'
+import { ago, day } from './ui'
 import { PLANS, naira } from './plans'
 import type { PlanId } from './plans'
 import { DEFAULTS, SMALL } from './types'
@@ -59,6 +59,54 @@ function Settings({ uid, admin }: { uid: string; admin: boolean }) {
   )
 }
 
+type Health = {
+  env: Record<string, boolean>; tables?: Record<string, string>; migration2?: boolean; websocket?: boolean; note?: string
+  scanner?: { running: boolean; heartbeat: string | null; last_error: string | null; approved: number | null; combos: number | null; note: string | null } | null
+}
+const checks = (h: Health): [string, boolean, string][] => {
+  const out: [string, boolean, string][] = [
+    ['Vercel setting SUPABASE_URL', !!h.env.SUPABASE_URL, 'Add it in Vercel as a Secret, then press Redeploy.'],
+    ['Vercel setting SUPABASE_SERVICE_KEY', !!h.env.SUPABASE_SERVICE_KEY, 'Add it in Vercel as a Secret, then press Redeploy.'],
+    ['Vercel setting TOKEN_ENCRYPTION_KEY', !!h.env.TOKEN_ENCRYPTION_KEY && !!h.env.TOKEN_ENCRYPTION_KEY_VALID, h.env.TOKEN_ENCRYPTION_KEY ? 'It must be exactly 64 characters: numbers 0-9 and letters a-f.' : 'Add it in Vercel as a Secret, then press Redeploy.'],
+    ['Vercel setting WEBHOOK_SECRET', !!h.env.WEBHOOK_SECRET, 'Needed so the bot can place trades. Add it, then Redeploy.'],
+  ]
+  if (h.tables) {
+    out.push(['Database: migration-2 applied', !!h.migration2, 'Run migration-2.sql in the Supabase SQL Editor.'])
+    out.push(['Database: key storage tables', h.tables.broker_links === 'ok' && h.tables.broker_secrets === 'ok', 'Run migration-2.sql in the Supabase SQL Editor.'])
+    out.push(['Database: trade records (migration-3)', h.tables.executions === 'ok', 'Run migration-3.sql in the Supabase SQL Editor.'])
+    out.push(['Server can check Deriv keys live', !!h.websocket, 'Optional. Keys still save, marked "not checked".'])
+  }
+  return out
+}
+
+export function SystemCheck() {
+  const [h, setH] = useState<Health | null>(null)
+  const [msg, setMsg] = useState('')
+  const [busy, setBusy] = useState(false)
+  const run = async () => {
+    setBusy(true); setMsg('')
+    const { data } = await supabase.auth.getSession()
+    const res = await fetch('/api/health', { headers: { Authorization: `Bearer ${data.session?.access_token ?? ''}` } })
+    const out = (await res.json().catch(() => null)) as (Health & { error?: string }) | null
+    setBusy(false)
+    if (!out || (!res.ok && !out.env)) { setMsg(out?.error ?? (res.status === 404 ? 'The check is not on your site yet. Upload the latest website files and redeploy.' : `The check failed (status ${res.status}).`)); return }
+    setH(out)
+  }
+  const sc = h?.scanner
+  return (
+    <div className="card ml"><div className="row"><h3 style={{ margin: 0 }}>System check</h3><button className="btn sm" disabled={busy} onClick={run}>{busy ? 'Checking...' : 'Run check'}</button></div>
+      {msg && <p className="err">{msg}</p>}
+      {h?.note && <p className="mu">{h.note}</p>}
+      {h && checks(h).map(([label, ok, fix]) => (
+        <div key={label} style={{ marginTop: 10 }}><div className="row"><span>{label}</span><b className={ok ? 'ok' : 'neg'}>{ok ? 'OK' : 'Fix'}</b></div>{!ok && <div className="mu">{fix}</div>}</div>
+      ))}
+      {sc && <div style={{ marginTop: 14 }}><div className="row"><span>Scanner</span><b>{sc.running ? 'On' : 'Paused'}</b></div>
+        <div className="mu">Last check {sc.heartbeat ? ago(sc.heartbeat) : 'never'}{sc.combos != null ? ` · ${sc.approved ?? 0} of ${sc.combos} strategies passed` : ''}</div>
+        {sc.last_error && <div className="err">{sc.last_error}</div>}</div>}
+    </div>
+  )
+}
+
 export default function Profile({ profile, sub, botAccess, refresh }: { profile: P; sub: Sub | null; botAccess: boolean; refresh: () => void }) {
   const admin = profile.role === 'admin'
   const [tab, setTab] = useState<'plan' | 'pay' | 'bot' | 'set'>('plan')
@@ -103,10 +151,10 @@ export default function Profile({ profile, sub, botAccess, refresh }: { profile:
         {(['signals', 'auto'] as PlanId[]).map((id) => {
           const mine = activeNow && sub?.plan === id
           return (
-            <div className="card" key={id}><h3>{PLANS[id].name}{mine && <span className="tg">your plan</span>}</h3>
+            <div className={`card${id === 'auto' ? ' feat' : ''}`} key={id}><h3>{PLANS[id].name}{mine && <span className="tg">your plan</span>}</h3>
               <div className="price">{naira(PLANS[id].price)}<small> / {PLANS[id].days} days</small></div>
               {mine && sub && <p className="mu">Active until {day(sub.expires_at)}</p>}
-              <p><button className="btn p" disabled={id === 'signals' && activeAuto} onClick={() => pay(id)}>{mine ? 'Renew' : id === 'auto' && activeNow ? 'Upgrade' : 'Get access'}</button></p></div>
+              <p><button className={`btn ${id === 'auto' ? 'brown' : 'p'}`} disabled={id === 'signals' && activeAuto} onClick={() => pay(id)}>{mine ? 'Renew' : id === 'auto' && activeNow ? 'Upgrade' : 'Get access'}</button></p></div>
           )
         })}
         <p className="mu">Paying again adds days to what you have left. Upgrading keeps your remaining days.</p></>}
@@ -120,7 +168,8 @@ export default function Profile({ profile, sub, botAccess, refresh }: { profile:
           <div className="row"><span className="mu">Your bot</span><b className={online ? 'ok' : 'neg'}>{online ? 'Online' : 'Offline'}</b></div>
           <p className="mu">Connect your Deriv account by pasting your Deriv API key in the Bot tab. Advanced option: you can instead run the MT5 bot on your own Windows PC, using the download below.</p>
           <p><a className="btn p" href="/fx-bot.zip" download>Download the bot</a></p>
-          <ol className="mu"><li>Log in to MT5 on your PC (start with a demo account)</li><li>Unzip the bot, rename env.example to .env and fill it in</li><li>Run pip install -r requirements.txt, then python bot.py</li><li>Open the Bot tab and turn it on</li></ol></>
+          <ol className="mu"><li>Log in to MT5 on your PC (start with a demo account)</li><li>Unzip the bot, rename env.example to .env and fill it in</li><li>Run pip install -r requirements.txt, then python bot.py</li><li>Open the Bot tab and turn it on</li></ol>
+          {admin && <SystemCheck />}</>
           : <><p className="mu">Auto-trading is part of the Signals + Auto-trading plan.</p><button className="btn p" onClick={() => setTab('plan')}>See plans</button></>}</div>}
 
       {tab === 'set' && botAccess && <Settings uid={profile.id} admin={admin} />}

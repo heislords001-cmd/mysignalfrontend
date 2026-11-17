@@ -24,7 +24,9 @@ export function DerivLink({ uid, onLink }: { uid: string; onLink?: (l: BrokerLin
   const call = async (method: 'POST' | 'DELETE', body?: object) => {
     const { data } = await supabase.auth.getSession()
     const res = await fetch('/api/deriv-link', { method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token ?? ''}` }, body: body ? JSON.stringify(body) : undefined })
-    return { ok: res.ok, out: (await res.json().catch(() => ({}))) as { error?: string; status?: string; note?: string } }
+    const out = (await res.json().catch(() => ({}))) as { error?: string; status?: string; note?: string }
+    if (!res.ok && !out.error) out.error = res.status === 404 ? 'The server function is not on your site yet. Upload the latest website files and redeploy.' : `The server answered with an error (status ${res.status}). The admin can run Profile, Bot access, System check to see what is missing.`
+    return { ok: res.ok, out }
   }
   const save = async (e: FormEvent) => {
     e.preventDefault()
@@ -56,7 +58,7 @@ export function DerivLink({ uid, onLink }: { uid: string; onLink?: (l: BrokerLin
       </ol>
       <label className="f">Deriv API key<input type="password" value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" required /></label>
       {msg && <p className={bad ? 'err' : 'mu'}>{msg}</p>}
-      <p style={{ marginBottom: 0 }}><button className="btn p" type="submit" disabled={busy}>{busy ? 'Saving...' : 'Save key'}</button></p>
+      <p style={{ marginBottom: 0 }}><button className="btn brown" type="submit" disabled={busy}>{busy ? 'Saving...' : 'Save key'}</button></p>
     </form>
   )
 }

@@ -45,3 +45,6 @@ Setup, after the Deriv key steps above:
 3. Run `migration-2.sql` and `migration-3.sql` in the SQL Editor (once each).
 4. In the Bot tab: paste your Deriv demo API key, press Turn bot on.
 As admin you can also tick "Also trade untested signals" to forward-test on your own demo account.
+
+## When something does not work: the System check
+Sign in as admin, open Profile, then Bot access, then press **Run check**. It lists every Vercel setting and database step that is missing, and how fixed the scanner is (last check, strategies passed, last error). It never shows a secret. If the check itself says it is not on your site yet, the latest website files were not uploaded or Vercel has not redeployed.

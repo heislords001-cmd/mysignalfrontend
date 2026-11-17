@@ -7,7 +7,7 @@ import Home from './Home'
 import Signals from './Signals'
 import Bot from './Bot'
 import Profile from './Profile'
-import { Brand, Icon } from './ui'
+import { Brand, Icon, ThemeToggle } from './ui'
 import type { IconName } from './ui'
 import type { Profile as P, Sub } from './types'
 
@@ -36,7 +36,7 @@ function Shell({ session }: { session: Session }) {
   return (
     <>
       <div className="app">
-        <div className="bar"><Brand /><button className="btn sm" onClick={() => supabase.auth.signOut()}><Icon n="out" />Sign out</button></div>
+        <div className="bar"><Brand /><div className="row" style={{ gap: 8 }}><ThemeToggle /><button className="btn sm" onClick={() => supabase.auth.signOut()}><Icon n="out" />Sign out</button></div></div>
         {tab === 'home' && <Home admin={admin} access={access} goPlan={() => setTab('pro')} />}
         {tab === 'sig' && <Signals access={access} goPlan={() => setTab('pro')} />}
         {tab === 'bot' && <Bot uid={profile.id} admin={admin} botAccess={botAccess} goPlan={() => setTab('pro')} />}
