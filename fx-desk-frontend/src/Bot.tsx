@@ -5,7 +5,7 @@ import { Locked, ago, usd } from './ui'
 import { DEFAULTS } from './types'
 import type { BotAccount, BotPos, BotState, BrokerLink, Cfg } from './types'
 
-type Exec = { id: number; status: string; message: string | null; stake: number | null; stop_loss: number | null; take_profit: number | null; created_at: string; signals: { symbol: string; side: string; timeframe: string | null } | null }
+type Exec = { id: number; status: string; message: string | null; stake: number | null; stop_loss: number | null; take_profit: number | null; created_at: string; kind?: string; symbol?: string | null; side?: string | null; signals: { symbol: string; side: string; timeframe: string | null } | null }
 
 const Bar = ({ label, text, v, max }: { label: string; text: string; v: number; max: number }) => {
   const pct = max > 0 ? Math.min(100, (v / max) * 100) : 0
@@ -63,13 +63,23 @@ export function DerivLink({ uid, onLink }: { uid: string; onLink?: (l: BrokerLin
   )
 }
 
+type TS = { stake_usd: number; max_open: number; daily_max: number; trade_untested: boolean; scalp_enabled: boolean; scalp_stake_usd: number; scalp_max_per_pair: number; scalp_max_open: number; scalp_daily_max: number }
+const TS_DEFAULTS: TS = { stake_usd: 1, max_open: 3, daily_max: 10, trade_untested: false, scalp_enabled: false, scalp_stake_usd: 1, scalp_max_per_pair: 2, scalp_max_open: 6, scalp_daily_max: 20 }
+
 export function TradeSettings({ uid, admin }: { uid: string; admin: boolean }) {
-  const [v, setV] = useState({ stake_usd: 1, max_open: 3, daily_max: 10, trade_untested: false })
+  const [v, setV] = useState<TS>(TS_DEFAULTS)
   const [msg, setMsg] = useState('')
   useEffect(() => {
     supabase.from('user_settings').select('data').eq('user_id', uid).maybeSingle().then(({ data }) => {
       const d = (data?.data ?? {}) as Record<string, unknown>
-      setV((p) => ({ stake_usd: Number(d.stake_usd ?? p.stake_usd), max_open: Number(d.max_open ?? p.max_open), daily_max: Number(d.daily_max ?? p.daily_max), trade_untested: d.trade_untested === true }))
+      setV((p) => {
+        const n = { ...p }
+        for (const k of Object.keys(TS_DEFAULTS) as (keyof TS)[]) {
+          if (typeof TS_DEFAULTS[k] === 'boolean') (n[k] as boolean) = d[k] === true
+          else if (d[k] !== undefined) (n[k] as number) = Number(d[k])
+        }
+        return n
+      })
     })
   }, [uid])
   const save = async (e: FormEvent) => {
@@ -77,17 +87,22 @@ export function TradeSettings({ uid, admin }: { uid: string; admin: boolean }) {
     const { data } = await supabase.from('user_settings').select('data').eq('user_id', uid).maybeSingle()
     const merged = { ...((data?.data ?? {}) as object), ...v, trade_untested: admin && v.trade_untested }
     const { error } = await supabase.from('user_settings').upsert({ user_id: uid, data: merged }, { onConflict: 'user_id' })
-    setMsg(error ? error.message : 'Saved. The next signal uses these numbers.')
+    setMsg(error ? error.message : 'Saved. The next trade uses these numbers.')
   }
-  const num = (k: 'stake_usd' | 'max_open' | 'daily_max', label: string, min: number, max: number, step: number) => (
-    <label className="f">{label}<input type="number" min={min} max={max} step={step} value={v[k]} onChange={(e) => setV({ ...v, [k]: Number(e.target.value) })} required /></label>
+  const num = (k: keyof TS, label: string, min: number, max: number) => (
+    <label className="f">{label}<input type="number" min={min} max={max} step={1} value={Number(v[k])} onChange={(e) => setV({ ...v, [k]: Number(e.target.value) })} required /></label>
   )
   return (
     <form className="card" onSubmit={save}>
-      <h3>Trading settings</h3>
-      <div className="form">{num('stake_usd', 'Stake per trade (USD, 1 to 10)', 1, 10, 1)}{num('max_open', 'Most trades open at once', 1, 10, 1)}{num('daily_max', 'Most trades per day', 1, 50, 1)}</div>
+      <h3>Signal trading</h3>
+      <p className="mu">The bot follows the scanner's approved signals and holds each trade until its take profit or stop loss.</p>
+      <div className="form">{num('stake_usd', 'Stake per trade (USD, 1 to 10)', 1, 10)}{num('max_open', 'Most signal trades open at once', 1, 10)}{num('daily_max', 'Most signal trades per day', 1, 50)}</div>
       {admin && <div className="sw"><span>Also trade untested signals<div className="mu">Your own demo account only</div></span><input type="checkbox" checked={v.trade_untested} onChange={(e) => setV({ ...v, trade_untested: e.target.checked })} /></div>}
-      <p className="mu">Each trade's stop loss is set so it can lose at most half of the stake.</p>
+      <h3 className="ml">Scalp mode</h3>
+      <div className="sw"><span>Scalp mode<div className="mu">Small, quick trades the bot finds itself</div></span><input type="checkbox" aria-label="Scalp mode" checked={v.scalp_enabled} onChange={(e) => setV({ ...v, scalp_enabled: e.target.checked })} /></div>
+      <p className="mu">The bot reads the market on its own. While the bigger trend is confirmed, it opens small trades with a tiny take profit and a stop loss. Deriv closes each one when it hits its target, and the bot opens another. It checks about every 5 minutes, so this is not high-speed scalping. Deriv charges fees on these trades, which can eat tiny profits, so watch the results on a demo account first.</p>
+      {v.scalp_enabled && <div className="form">{num('scalp_stake_usd', 'Stake per scalp (USD, 1 to 10)', 1, 10)}{num('scalp_max_per_pair', 'Most scalps per pair', 1, 5)}{num('scalp_max_open', 'Most scalps open at once', 1, 20)}{num('scalp_daily_max', 'Most scalps per day', 1, 100)}</div>}
+      <p className="mu">Every trade gets a stop loss that can lose at most half of its stake.</p>
       <p className="row"><span className={msg.startsWith('Saved') ? 'mu' : 'err'}>{msg}</span><button className="btn p" type="submit">Save</button></p>
     </form>
   )
@@ -96,18 +111,19 @@ export function TradeSettings({ uid, admin }: { uid: string; admin: boolean }) {
 export function ExecList({ uid }: { uid: string }) {
   const [rows, setRows] = useState<Exec[]>([])
   useEffect(() => {
-    const load = () => { supabase.from('executions').select('id,status,message,stake,stop_loss,take_profit,created_at,signals(symbol,side,timeframe)').eq('user_id', uid).order('created_at', { ascending: false }).limit(10).then(({ data }) => data && setRows(data as unknown as Exec[])) }
+    const load = () => { supabase.from('executions').select('id,status,message,stake,stop_loss,take_profit,created_at,kind,symbol,side,signals(symbol,side,timeframe)').eq('user_id', uid).order('created_at', { ascending: false }).limit(10).then(({ data }) => data && setRows(data as unknown as Exec[])) }
     load()
     const t = setInterval(load, 15000)
     return () => clearInterval(t)
   }, [uid])
+  const title = (r: Exec) => r.signals ? `${r.signals.symbol} ${r.signals.side}${r.signals.timeframe ? ` · ${r.signals.timeframe}` : ''}` : r.symbol ? `${r.symbol} ${r.side ?? ''}`.trim() : 'Trade'
   return (
     <div className="card"><h3>Trades sent</h3>
-      {rows.length === 0 && <p className="mu">Nothing yet. A trade appears here each time the bot acts on a signal.</p>}
+      {rows.length === 0 && <p className="mu">Nothing yet. A trade appears here each time the bot acts on a signal or opens a scalp.</p>}
       {rows.map((r) => (
         <div className="sig" key={r.id}>
           <span className={`badge ${r.status === 'bought' ? 'win' : r.status === 'failed' ? 'loss' : 'open'}`}>{r.status === 'bought' ? 'Placed' : r.status === 'failed' ? 'Failed' : 'Skipped'}</span>
-          <b>{r.signals ? `${r.signals.symbol} ${r.signals.side}${r.signals.timeframe ? ` · ${r.signals.timeframe}` : ''}` : 'Signal'}</b><span className="mu">{ago(r.created_at)}</span>
+          <b>{title(r)}{r.kind === 'scalp' && <span className="tg">Scalp</span>}</b><span className="mu">{ago(r.created_at)}</span>
           {r.message && <div className="mu" style={{ gridColumn: '1 / -1' }}>{r.message}{r.status === 'bought' && r.stake != null ? ` Stake $${r.stake}, stop loss $${r.stop_loss}, take profit $${r.take_profit}.` : ''}</div>}
         </div>
       ))}
@@ -172,7 +188,7 @@ export default function Bot({ uid, admin = false, botAccess, goPlan }: { uid: st
         <div className="row">
           <div>
             <b><span className={`dot ${on ? '' : 'off'}`} />{on ? 'Bot on' : 'Bot off'}</b>
-            <div className="mu">{linked ? 'Places each approved signal on your Deriv demo account.' : 'Connect your Deriv account above first.'}</div>
+            <div className="mu">{linked ? 'Trades on your Deriv demo account: approved signals, and small scalps if you switch scalp mode on.' : 'Connect your Deriv account above first.'}</div>
           </div>
           <button className={`btn ${on ? '' : 'p'}`} disabled={!st || (!linked && !mt5)} onClick={() => run({ bot_on: !on })}>{on ? 'Turn bot off' : 'Turn bot on'}</button>
         </div>

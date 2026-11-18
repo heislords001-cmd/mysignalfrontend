@@ -359,6 +359,28 @@ export default function Bot({ uid, admin = false, botAccess, goPlan }: { uid: st
   }
   const n = (k: string) => Number(cfg[k])
   const mt5 = !!acct?.updated_at && Date.now() - new Date(acct.updated_at).getTime() < 30000      // an MT5 bot is reporting in
+  // Start bot: one press turns the bot on, turns scalp mode on, and switches this member's signals on.
+  // The shared scanner starts on GitHub if it is off. Trades are placed on the Deriv demo account.
+  const [botNote, setBotNote] = useState('')
+  const setScalp = async (on: boolean) => {
+    const { data: cur } = await supabase.from('user_settings').select('data').eq('user_id', uid).maybeSingle()
+    await supabase.from('user_settings').upsert({ user_id: uid, data: { ...((cur?.data ?? {}) as object), scalp_enabled: on } }, { onConflict: 'user_id' })
+  }
+  const startBot = async () => {
+    setBotNote('Starting the bot...')
+    const { data } = await supabase.auth.getSession()
+    await setScalp(true)
+    await run({ bot_on: true })
+    const res = await fetch('/api/scanner-control', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token ?? ''}` }, body: JSON.stringify({ action: 'receive_on' }) })
+    const j = (await res.json().catch(() => ({}))) as { note?: string; error?: string }
+    setBotNote(res.ok ? (j.note ?? 'The bot is on.') : (j.error ?? 'The scanner could not start.'))
+  }
+  const stopBot = async () => {
+    setBotNote('Stopping the bot...')
+    await setScalp(false)
+    await run({ bot_on: false })
+    setBotNote('The bot is off. Your signals stay as they are.')
+  }
   const on = !!st?.bot_on
   const floating = acct?.floating ?? 0
   return (
@@ -378,7 +400,8 @@ export default function Bot({ uid, admin = false, botAccess, goPlan }: { uid: st
             <b><span className={`dot ${on ? '' : 'off'}`} />{on ? 'Bot on' : 'Bot off'}</b>
             <div className="mu">{linked ? 'Trades on your Deriv demo account: approved signals, and small scalps if you switch scalp mode on.' : 'Connect your Deriv account above first.'}</div>
           </div>
-          <button className={`btn ${on ? '' : 'p'}`} disabled={!st || (!linked && !mt5)} onClick={() => run({ bot_on: !on })}>{on ? 'Turn bot off' : 'Turn bot on'}</button>
+          <button className={`btn ${on ? 'stop' : 'p'}`} disabled={!st || (!linked && !mt5)} onClick={on ? stopBot : startBot}>{on ? 'Stop bot' : 'Start bot'}</button>
+          {botNote && <p className="mu">{botNote}</p>}
         </div>
         <p className="mu ml">Turning the bot off stops new trades. Trades already open keep their stop loss and take profit.</p>
         {st?.note && <p className="mu">{st.note}</p>}

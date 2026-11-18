@@ -48,3 +48,14 @@ As admin you can also tick "Also trade untested signals" to forward-test on your
 
 ## When something does not work: the System check
 Sign in as admin, open Profile, then Bot access, then press **Run check**. It lists every Vercel setting and database step that is missing, and how fixed the scanner is (last check, strategies passed, last error). It never shows a secret. If the check itself says it is not on your site yet, the latest website files were not uploaded or Vercel has not redeployed.
+
+## Scalp mode (the bot trades small and quick on its own)
+Besides following signals, the bot can read the market itself. The scanner saves what it sees on each pair (the bigger trend, the price, the 5-minute average, the typical candle size) in a table called `market_state`. When it changes, Supabase calls `/api/scalp`. For every member who switched scalp mode on, the bot opens a small trade with a tiny take profit and a stop loss. Deriv closes each trade by itself when it hits its target, and the next pass opens another while the trend holds.
+Limits built in: demo accounts only; a stop loss on every trade that can lose at most half the stake; stake capped at $10; at most 2 scalps per pair, 6 open, and 20 a day by default (the member can lower these).
+It checks about every 5 minutes, because that is how often the free scanner runs. Deriv also charges fees on multiplier trades, which can eat a tiny profit. This mode has not been tested against the real Deriv: watch the results on a demo account.
+
+Setup, in addition to the signal webhook:
+1. Run `migration-4.sql` in the Supabase SQL Editor (once).
+2. Upload the new backend files too (the scanner has to save `market_state`).
+3. In Supabase, Database, Webhooks, create a SECOND hook: table `market_state`, events `Insert` and `Update`, method POST, URL `https://YOUR-SITE.vercel.app/api/scalp`, and the same `Authorization` header as the first hook.
+4. In the Bot tab, switch Scalp mode on and press Save.

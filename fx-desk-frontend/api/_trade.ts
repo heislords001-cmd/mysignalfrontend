@@ -68,3 +68,27 @@ export class DerivSession {
 }
 
 export const errText = (m: any) => `${m?.error?.message ?? 'Deriv returned an error.'}`.slice(0, 200)
+
+// ---------- scalp mode: the bot reads the market itself ----------
+export interface MarketState { symbol: string; trend: string; price: number; ema50: number; atr: number; updated_at: string }
+export const SCALP_TP_ATR = 0.5   // take profit: half a typical candle
+export const SCALP_SL_ATR = 2     // emergency stop: two typical candles
+export const STALE_MS = 10 * 60000
+export type ScalpPlan = { ok: true; side: 'buy' | 'sell'; entry: number; sl: number; tp1: number } | { ok: false; reason: string }
+
+/** Same idea as the signal strategy: the bigger trend is confirmed, and price sits on the right side of the 5-minute average
+ *  without having run too far from it. Then a small quick trade is allowed. */
+export function planScalp(m: MarketState, now = Date.now()): ScalpPlan {
+  const no = (reason: string): ScalpPlan => ({ ok: false, reason })
+  if (!SYMBOLS[m?.symbol]) return no('unknown symbol')
+  const side = m.trend === 'buy' ? 'buy' : m.trend === 'sell' ? 'sell' : null
+  if (!side) return no('no confirmed trend')
+  const [p, e, a] = [Number(m.price), Number(m.ema50), Number(m.atr)]
+  if (![p, e, a].every((x) => Number.isFinite(x) && x > 0)) return no('bad market numbers')
+  const at = Date.parse(m.updated_at)
+  if (!Number.isFinite(at) || now - at > STALE_MS) return no('market data is stale')
+  if (side === 'buy' ? p <= e : p >= e) return no('price is on the wrong side of the average')
+  if (Math.abs(p - e) > 1.5 * a) return no('price has run too far from the average')
+  const d = side === 'buy' ? 1 : -1
+  return { ok: true, side, entry: p, sl: p - d * SCALP_SL_ATR * a, tp1: p + d * SCALP_TP_ATR * a }
+}
