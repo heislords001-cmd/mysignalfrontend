@@ -69,6 +69,7 @@ function Shell({ session }: { session: Session }) {
         {tab === 'chart' && (pane.chart === 'b' ? <div className="page"><News /></div> : <ChartTab uid={profile.id} />)}
         {tab === 'bot' && <Bot uid={profile.id} admin={admin} botAccess={botAccess} goPlan={() => setTab('pro')} />}
         {tab === 'pro' && <Profile profile={profile} sub={sub} botAccess={botAccess} refresh={refresh} />}
+        <footer><a className="site-tag" href="https://44thstudio.my.id" target="_blank" rel="noopener noreferrer">Built by 44th_being · 44TH-STUDIO INC</a></footer>
       </div>
       <nav className="tabs">{tabs.map(([k]) => { const [ic, l] = shown(k); return (<button key={k} className={tab === k ? 'on' : ''} onPointerDown={() => press(k)} onPointerUp={release} onPointerLeave={release} onPointerCancel={release} onContextMenu={(e) => e.preventDefault()} onClick={() => tap(k)}>{SECOND[k] && <span className="tab-dot" />}<Icon n={ic} />{l}</button>) })}</nav>
     </>

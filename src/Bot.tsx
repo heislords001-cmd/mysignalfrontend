@@ -231,6 +231,45 @@ export function TradeSettings({ uid, admin }: { uid: string; admin: boolean }) {
   )
 }
 
+
+// Trades placed in the last minute, and trades placed since Start bot was pressed (this run).
+export function LiveTrades({ uid }: { uid: string }) {
+  const [minute, setMinute] = useState<Exec[]>([])
+  const [run, setRun] = useState<Exec[]>([])
+  const [since, setSince] = useState<string | null>(null)
+  useEffect(() => {
+    supabase.from('user_settings').select('data').eq('user_id', uid).maybeSingle().then(({ data }) => {
+      setSince(((data?.data ?? {}) as Record<string, unknown>).scalp_started_at as string ?? null)
+    })
+  }, [uid])
+  useEffect(() => {
+    const load = async () => {
+      const oneMinute = new Date(Date.now() - 60000).toISOString()
+      const m = await supabase.from('executions').select('id,status,message,stake,stop_loss,take_profit,profit,closed_at,created_at,kind,symbol,side').eq('user_id', uid).gte('created_at', oneMinute).order('created_at', { ascending: false })
+      setMinute((m.data ?? []) as unknown as Exec[])
+      if (since) {
+        const r = await supabase.from('executions').select('id,status,message,stake,stop_loss,take_profit,profit,closed_at,created_at,kind,symbol,side').eq('user_id', uid).gte('created_at', since).order('created_at', { ascending: false }).limit(50)
+        setRun((r.data ?? []) as unknown as Exec[])
+      }
+    }
+    load()
+    const t = setInterval(load, 5000)
+    return () => clearInterval(t)
+  }, [uid, since])
+  const line = (r: Exec) => `${new Date(r.created_at).toLocaleTimeString('en-GB', { timeZone: 'Africa/Lagos', hour: '2-digit', minute: '2-digit', second: '2-digit' })} · ${r.symbol ?? ''} ${r.side ?? ''} · ${r.status === 'bought' ? 'placed' : r.status}${r.profit != null ? ` · ${Number(r.profit) >= 0 ? '+' : ''}$${Number(r.profit).toFixed(2)}` : ''}`
+  return (
+    <div className="card">
+      <h3>In the last minute</h3>
+      {minute.length === 0 && <p className="mu">No trades in the last minute.</p>}
+      {minute.map((r) => <div key={r.id} className="mu" style={{ padding: '4px 0' }}>{line(r)}</div>)}
+      <h3 style={{ marginTop: 14 }}>This run</h3>
+      {!since && <p className="mu">Press Start bot to begin a run.</p>}
+      {since && run.length === 0 && <p className="mu">No trades yet in this run.</p>}
+      {run.map((r) => <div key={r.id} className="mu" style={{ padding: '4px 0' }}>{line(r)}</div>)}
+    </div>
+  )
+}
+
 export function ExecList({ uid }: { uid: string }) {
   const [rows, setRows] = useState<Exec[]>([])
   useEffect(() => {
@@ -362,9 +401,10 @@ export default function Bot({ uid, admin = false, botAccess, goPlan }: { uid: st
   // Start bot: one press turns the bot on, turns scalp mode on, and switches this member's signals on.
   // The shared scanner starts on GitHub if it is off. Trades are placed on the Deriv demo account.
   const [botNote, setBotNote] = useState('')
-  const setScalp = async (on: boolean) => {
+  const setScalp = async (on: boolean, starting = false) => {
     const { data: cur } = await supabase.from('user_settings').select('data').eq('user_id', uid).maybeSingle()
-    await supabase.from('user_settings').upsert({ user_id: uid, data: { ...((cur?.data ?? {}) as object), scalp_enabled: on } }, { onConflict: 'user_id' })
+    const extra = starting ? { scalp_started_at: new Date().toISOString() } : {}
+    await supabase.from('user_settings').upsert({ user_id: uid, data: { ...((cur?.data ?? {}) as object), scalp_enabled: on, ...extra } }, { onConflict: 'user_id' })
   }
   const startBot = async () => {
     setBotNote('Checking the scanner...')
@@ -376,7 +416,7 @@ export default function Bot({ uid, admin = false, botAccess, goPlan }: { uid: st
       setBotNote(j.error ?? 'The bot could not start.')
       return
     }
-    await setScalp(true)
+    await setScalp(true, true)
     await run({ bot_on: true })
     setBotNote(j.note ?? 'The bot is on.')
   }
@@ -455,6 +495,7 @@ export default function Bot({ uid, admin = false, botAccess, goPlan }: { uid: st
       {sec === 'settings' && !linked && <p className="mu">Connect an account in Control first.</p>}
 
       {sec === 'trades' && linked && <>
+        <LiveTrades uid={uid} />
       {linked && <ExecList uid={uid} />}
       </>}
       {sec === 'trades' && !linked && <p className="mu">Connect an account in Control first.</p>}
