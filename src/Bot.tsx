@@ -371,15 +371,21 @@ export default function Bot({ uid, admin = false, botAccess, goPlan }: { uid: st
     const { data } = await supabase.auth.getSession()
     await setScalp(true)
     await run({ bot_on: true })
-    const res = await fetch('/api/scanner-control', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token ?? ''}` }, body: JSON.stringify({ action: 'receive_on' }) })
-    const j = (await res.json().catch(() => ({}))) as { note?: string; error?: string }
-    setBotNote(res.ok ? (j.note ?? 'The bot is on.') : (j.error ?? 'The scanner could not start.'))
+    const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token ?? ''}` }
+    const sig = await fetch('/api/scanner-control', { method: 'POST', headers, body: JSON.stringify({ action: 'receive_on' }) })
+    const sj = (await sig.json().catch(() => ({}))) as { note?: string; error?: string }
+    const sc = await fetch('/api/scanner-control', { method: 'POST', headers, body: JSON.stringify({ action: 'scalp_start' }) })
+    const sc2 = (await sc.json().catch(() => ({}))) as { note?: string; error?: string }
+    setBotNote(sc.ok ? (sc2.note ?? 'The bot is on.') : (sc2.error ?? 'Scalping could not start.') + (sig.ok ? '' : ` ${sj.error ?? ''}`))
   }
   const stopBot = async () => {
     setBotNote('Stopping the bot...')
+    const { data } = await supabase.auth.getSession()
     await setScalp(false)
     await run({ bot_on: false })
-    setBotNote('The bot is off. Your signals stay as they are.')
+    const res = await fetch('/api/scanner-control', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token ?? ''}` }, body: JSON.stringify({ action: 'scalp_stop' }) })
+    const j = (await res.json().catch(() => ({}))) as { note?: string; error?: string }
+    setBotNote(res.ok ? (j.note ?? 'The bot is off.') : (j.error ?? 'The bot is off, but the scalp run may still be up.'))
   }
   const on = !!st?.bot_on
   const floating = acct?.floating ?? 0
