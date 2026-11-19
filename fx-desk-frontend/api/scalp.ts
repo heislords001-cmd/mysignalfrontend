@@ -1,7 +1,7 @@
 // Vercel function for SCALP mode. Supabase calls it every time the scanner refreshes a pair in market_state
 // (Database Webhook on INSERT and UPDATE of market_state).
-import { executeScalp } from './_execute'
-import { checkHook } from './_hook'
+import { executeScalp } from './_execute.js'
+import { checkHook } from './_hook.js'
 
 interface Req { method?: string; headers: Record<string, string | undefined>; body?: { type?: string; table?: string; record?: any } }
 interface Res { status(c: number): Res; json(b: unknown): void }

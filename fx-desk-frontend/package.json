@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "vite",
     "prebuild": "python3 make_member_bot.py || python make_member_bot.py || echo skipped",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
+    "build": "node scripts/check-api.mjs && tsc && vite build",
+    "preview": "vite preview",
+    "check:api": "node scripts/check-api.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

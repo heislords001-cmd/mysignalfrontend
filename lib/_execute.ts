@@ -76,10 +76,28 @@ export async function executeSignal(s: Signal): Promise<Tally> {
 export async function executeScalp(mk: Market): Promise<Tally> {
   const plan = planScalp(mk)
   if (!plan.ok) return { ...zero(), note: plan.reason }
+  return executeScalpOrder({ symbol: mk.symbol, updated_at: mk.updated_at, side: plan.side, entry: plan.entry, sl: plan.sl, tp1: plan.tp1 })
+}
+
+// A plan made by the backend (the GitHub run). Checked here before any order is placed.
+export interface ScalpOrder { symbol: string; updated_at: string; side: 'buy' | 'sell'; entry: number; sl: number; tp1: number }
+export function checkScalpOrder(o: ScalpOrder, now = Date.now()): string | null {
+  if (!SYMBOLS[o?.symbol]) return 'unknown symbol'
+  if (o.side !== 'buy' && o.side !== 'sell') return 'side must be buy or sell'
+  const [en, sl, tp] = [Number(o.entry), Number(o.sl), Number(o.tp1)]
+  if (![en, sl, tp].every((x) => Number.isFinite(x) && x > 0)) return 'bad price numbers'
+  if (o.side === 'buy' ? !(sl < en && en < tp) : !(sl > en && en > tp)) return 'stop and target are on the wrong side'
+  const at = Date.parse(o.updated_at)
+  if (!Number.isFinite(at) || now - at > 10 * 60000) return 'market data is stale'
+  return null
+}
+export async function executeScalpOrder(o: ScalpOrder): Promise<Tally> {
+  const bad = checkScalpOrder(o)
+  if (bad) return { ...zero(), note: bad }
   const m = await loadMembers()
   if (!m) return { ...zero(), note: 'no member has the bot on' }
   const eligible = m.ids.filter((id) => hasPlan(m, id) && m.L.has(id) && m.K.has(id) && m.U.get(id)?.data?.scalp_enabled === true && m.U.get(id)?.data?.signals_on !== false)
-  return runOrder({ kind: 'scalp', key: `scalp:${mk.symbol}:${mk.updated_at}`, signalId: null, symbol: mk.symbol, side: plan.side, entry: plan.entry, sl: plan.sl, tp1: plan.tp1 }, eligible, m)
+  return runOrder({ kind: 'scalp', key: `scalp:${o.symbol}:${o.updated_at}`, signalId: null, symbol: o.symbol, side: o.side, entry: o.entry, sl: o.sl, tp1: o.tp1 }, eligible, m)
 }
 
 /** One safe demo trade on the member's own account, without waiting for a signal or a webhook. Uses the same rules as a real signal. */

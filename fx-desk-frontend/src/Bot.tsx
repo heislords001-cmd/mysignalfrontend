@@ -5,7 +5,7 @@ import { Locked, ago, usd } from './ui'
 import { DEFAULTS } from './types'
 import type { BotAccount, BotPos, BotState, BrokerLink, Cfg } from './types'
 
-type Exec = { id: number; status: string; message: string | null; stake: number | null; stop_loss: number | null; take_profit: number | null; created_at: string; kind?: string; symbol?: string | null; side?: string | null; signals: { symbol: string; side: string; timeframe: string | null } | null }
+type Exec = { id: number; status: string; profit?: number | null; closed_at?: string | null; message: string | null; stake: number | null; stop_loss: number | null; take_profit: number | null; created_at: string; kind?: string; symbol?: string | null; side?: string | null; signals: { symbol: string; side: string; timeframe: string | null } | null }
 
 const Bar = ({ label, text, v, max }: { label: string; text: string; v: number; max: number }) => {
   const pct = max > 0 ? Math.min(100, (v / max) * 100) : 0
@@ -111,7 +111,7 @@ export function TradeSettings({ uid, admin }: { uid: string; admin: boolean }) {
 export function ExecList({ uid }: { uid: string }) {
   const [rows, setRows] = useState<Exec[]>([])
   useEffect(() => {
-    const load = () => { supabase.from('executions').select('id,status,message,stake,stop_loss,take_profit,created_at,kind,symbol,side,signals(symbol,side,timeframe)').eq('user_id', uid).order('created_at', { ascending: false }).limit(10).then(({ data }) => data && setRows(data as unknown as Exec[])) }
+    const load = () => { supabase.from('executions').select('id,status,message,stake,stop_loss,take_profit,profit,closed_at,created_at,kind,symbol,side,signals(symbol,side,timeframe)').eq('user_id', uid).order('created_at', { ascending: false }).limit(10).then(({ data }) => data && setRows(data as unknown as Exec[])) }
     load()
     const t = setInterval(load, 15000)
     return () => clearInterval(t)
@@ -125,8 +125,64 @@ export function ExecList({ uid }: { uid: string }) {
           <span className={`badge ${r.status === 'bought' ? 'win' : r.status === 'failed' ? 'loss' : 'open'}`}>{r.status === 'bought' ? 'Placed' : r.status === 'failed' ? 'Failed' : 'Skipped'}</span>
           <b>{title(r)}{r.kind === 'scalp' && <span className="tg">Scalp</span>}</b><span className="mu">{ago(r.created_at)}</span>
           {r.message && <div className="mu" style={{ gridColumn: '1 / -1' }}>{r.message}{r.status === 'bought' && r.stake != null ? ` Stake $${r.stake}, stop loss $${r.stop_loss}, take profit $${r.take_profit}.` : ''}</div>}
+          {r.status === 'bought' && <div className={r.closed_at ? ((r.profit ?? 0) >= 0 ? 'ok' : 'neg') : 'mu'} style={{ gridColumn: '1 / -1', fontSize: 13 }}>{r.closed_at ? `Closed ${usd(r.profit ?? 0)}` : 'Still open.'}</div>}
         </div>
       ))}
+    </div>
+  )
+}
+
+type ResRow = { id: number; kind?: string; profit: number | null; closed_at: string | null; created_at: string }
+type Open = { count: number; floating: number }
+const tally = (list: ResRow[]) => {
+  const n = list.length, wins = list.filter((r) => (r.profit ?? 0) > 0).length
+  return { n, rate: n ? Math.round((wins / n) * 100) : 0, net: Math.round(list.reduce((a, r) => a + (r.profit ?? 0), 0) * 100) / 100 }
+}
+
+export function ResultsCard({ uid }: { uid: string }) {
+  const [rows, setRows] = useState<ResRow[]>([])
+  const [open, setOpen] = useState<Open | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+  const load = useCallback(() => {
+    supabase.from('executions').select('id,kind,profit,closed_at,created_at').eq('user_id', uid).eq('status', 'bought').order('created_at', { ascending: false }).limit(500).then(({ data }) => data && setRows(data as ResRow[]))
+  }, [uid])
+  const sync = useCallback(async () => {
+    setBusy(true); setMsg('')
+    const { data } = await supabase.auth.getSession()
+    const res = await fetch('/api/deriv-results', { method: 'POST', headers: { Authorization: `Bearer ${data.session?.access_token ?? ''}` } })
+    const out = (await res.json().catch(() => null)) as { ok?: boolean; open?: Open; note?: string; error?: string } | null
+    setBusy(false)
+    if (!res.ok || !out?.ok) setMsg(out?.note ?? out?.error ?? `Could not update results (status ${res.status}).`)
+    else setOpen(out.open ?? null)
+    load()
+  }, [load])
+  useEffect(() => {
+    load(); sync()                                   // brings results up to date whenever the tab opens, then once a minute
+    const t = setInterval(sync, 60000)
+    return () => clearInterval(t)
+  }, [load, sync])
+  const closed = rows.filter((r) => r.closed_at && r.profit != null)
+  const all = tally(closed), sig = tally(closed.filter((r) => r.kind !== 'scalp')), sc = tally(closed.filter((r) => r.kind === 'scalp'))
+  const today = tally(closed.filter((r) => (r.closed_at as string).startsWith(new Date().toISOString().slice(0, 10))))
+  const openCount = open ? open.count : rows.filter((r) => !r.closed_at).length
+  const line = (label: string, t: { n: number; rate: number; net: number }) => (
+    <div className="row" style={{ marginTop: 6 }}><span className="mu">{label}</span><b>{t.n} {t.n === 1 ? 'trade' : 'trades'}{t.n ? ` · ${t.rate}% wins · ` : ' · '}<span className={t.net >= 0 ? 'ok' : 'neg'}>{usd(t.net)}</span></b></div>
+  )
+  return (
+    <div className="card">
+      <div className="row"><h3 style={{ margin: 0 }}>Results</h3><button className="btn sm" disabled={busy} onClick={sync}>{busy ? 'Updating...' : 'Update'}</button></div>
+      {msg && <p className="err">{msg}</p>}
+      {all.n === 0 ? <p className="mu">No finished trades yet. A trade counts once it hits its take profit or its stop loss.</p> : <>
+        <div className="stats ml">
+          <div className="stat"><span className="mu">Finished</span><b>{all.n}</b></div>
+          <div className="stat"><span className="mu">Wins</span><b>{all.rate}%</b></div>
+          <div className="stat"><span className="mu">Net</span><b className={all.net >= 0 ? 'ok' : 'neg'}>{usd(all.net)}</b></div>
+        </div>
+        {line('Today', today)}{line('Signals', sig)}{line('Scalps', sc)}
+      </>}
+      <div className="row" style={{ marginTop: 6 }}><span className="mu">Open now</span><b>{openCount}{open ? ` · floating ${usd(open.floating)}` : ''}</b></div>
+      <p className="mu">Profit is what Deriv paid out minus your stake, after its fees. Demo money only. Past results do not promise future ones.</p>
     </div>
   )
 }
@@ -204,6 +260,7 @@ export default function Bot({ uid, admin = false, botAccess, goPlan }: { uid: st
         )}
       </div>
       {linked && <TradeSettings uid={uid} admin={admin} />}
+      {linked && <ResultsCard uid={uid} />}
       {linked && <ExecList uid={uid} />}
       {mt5 && <>
         <div className="stats c2">

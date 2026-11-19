@@ -4,10 +4,10 @@
 //     the trend is confirmed. Deriv closes each one by itself at its small take profit (or its stop), and the next pass opens another.
 // Safety rules, all enforced here: DEMO accounts only for now, stake capped, trades per day capped, open trades capped,
 // one trade per signal / per market reading per member, and a stop loss on every trade.
-import { decrypt } from './_crypto'
-import { dbHeaders, env } from './_auth'
-import { DerivSession, MAX_STAKE, MIN_STAKE, SYMBOLS, errText, planScalp, planTrade } from './_trade'
-import type { MarketState } from './_trade'
+import { decrypt } from './_crypto.js'
+import { dbHeaders, env } from './_auth.js'
+import { DerivSession, MAX_STAKE, MIN_STAKE, SYMBOLS, errText, planScalp, planTrade } from './_trade.js'
+import type { MarketState } from './_trade.js'
 
 export interface Signal { id: number; symbol: string; side: string; entry: number; sl: number; tp1: number; approved?: boolean; expires_at?: string | null }
 export type Market = MarketState
