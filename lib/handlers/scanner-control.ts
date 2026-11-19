@@ -106,7 +106,13 @@ export default async function handler(req: Req, res: Res) {
     }
 
     if (action === 'scalp_start') {
-      // Start bot: one scalp run on GitHub for everyone who has scalp on. A second press does not start another.
+      // Start bot: the bot only works while the scanner is on. It never switches the scanner on itself.
+      const st = (await (await fetch(`${sb}/rest/v1/scanner_state?id=eq.1&select=running,heartbeat`, { headers: h })).json()) as { running: boolean; heartbeat: string | null }[]
+      const beat = st[0]?.heartbeat ? Date.parse(st[0].heartbeat) : 0
+      if (!st[0]?.running || Date.now() - beat > 3 * 60000) {
+        return res.status(409).json({ error: 'The scanner is off. Turn on the scanner from the Home page first, then press Start bot.' })
+      }
+      // one scalp run on GitHub for everyone who has scalp on. A second press does not start another.
       if (!token) return res.status(500).json({ error: 'GITHUB_SCANNER_TOKEN is not set in Vercel. The scalp run was NOT started.' })
       let active: number[]
       try { active = await activeRunIds(repo, token, SCALP_WORKFLOW) } catch (e) {

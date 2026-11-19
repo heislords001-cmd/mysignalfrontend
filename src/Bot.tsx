@@ -367,16 +367,18 @@ export default function Bot({ uid, admin = false, botAccess, goPlan }: { uid: st
     await supabase.from('user_settings').upsert({ user_id: uid, data: { ...((cur?.data ?? {}) as object), scalp_enabled: on } }, { onConflict: 'user_id' })
   }
   const startBot = async () => {
-    setBotNote('Starting the bot...')
+    setBotNote('Checking the scanner...')
     const { data } = await supabase.auth.getSession()
+    const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token ?? ''}` }
+    const res = await fetch('/api/scanner-control', { method: 'POST', headers, body: JSON.stringify({ action: 'scalp_start' }) })
+    const j = (await res.json().catch(() => ({}))) as { note?: string; error?: string }
+    if (!res.ok) {
+      setBotNote(j.error ?? 'The bot could not start.')
+      return
+    }
     await setScalp(true)
     await run({ bot_on: true })
-    const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token ?? ''}` }
-    const sig = await fetch('/api/scanner-control', { method: 'POST', headers, body: JSON.stringify({ action: 'receive_on' }) })
-    const sj = (await sig.json().catch(() => ({}))) as { note?: string; error?: string }
-    const sc = await fetch('/api/scanner-control', { method: 'POST', headers, body: JSON.stringify({ action: 'scalp_start' }) })
-    const sc2 = (await sc.json().catch(() => ({}))) as { note?: string; error?: string }
-    setBotNote(sc.ok ? (sc2.note ?? 'The bot is on.') : (sc2.error ?? 'Scalping could not start.') + (sig.ok ? '' : ` ${sj.error ?? ''}`))
+    setBotNote(j.note ?? 'The bot is on.')
   }
   const stopBot = async () => {
     setBotNote('Stopping the bot...')
