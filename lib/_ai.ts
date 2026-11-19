@@ -13,7 +13,7 @@ export type Endpoint = { url: string; key: string; model: string; provider: stri
 export type AiResult = { ok: true; text: string; model: string } | { ok: false; status: number | null; model: string; detail: string }
 
 const PRESETS: Record<string, { url: string; keyEnv: string; text: string; vision: string }> = {
-  nvidia: { url: 'https://integrate.api.nvidia.com/v1', keyEnv: 'NVIDIA_API_KEY', text: 'mistralai/mistral-medium-3.5-128b', vision: 'nvidia/llama-3.1-nemotron-nano-vl-8b-v1' },
+  nvidia: { url: 'https://integrate.api.nvidia.com/v1', keyEnv: 'NVIDIA_API_KEY', text: 'mistralai/mistral-medium-3.5-128b', vision: 'mistralai/mistral-large-4-1t-a52b' },
   mistral: { url: 'https://api.mistral.ai/v1', keyEnv: 'MISTRAL_API_KEY', text: 'mistral-large-latest', vision: 'pixtral-large-latest' },
 }
 
