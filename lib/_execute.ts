@@ -180,3 +180,21 @@ async function placeForMember(userId: string, o: Order, secret: string, cfg: Row
     }
   }
 }
+
+
+// Members with the bot on, for the scalp monitor.
+export async function activeMemberIds(): Promise<string[]> {
+  const m = await loadMembers()
+  return m ? m.ids : []
+}
+
+// Opens one scalp position for one member, through the same order path as everything else.
+export async function openScalpFor(o: ScalpOrder, userId: string, key: string): Promise<Tally> {
+  const bad = checkScalpOrder(o)
+  if (bad) return { ...zero(), note: bad }
+  const m = await loadMembers()
+  if (!m || !m.ids.includes(userId)) return { ...zero(), note: 'not a member with the bot on' }
+  const ok = hasPlan(m, userId) && m.L.has(userId) && m.K.has(userId) && m.U.get(userId)?.data?.scalp_enabled === true && m.U.get(userId)?.data?.signals_on !== false
+  if (!ok) return { ...zero(), note: 'scalp is not on for this member, or no key is saved' }
+  return runOrder({ kind: 'scalp', key, signalId: null, symbol: o.symbol, side: o.side, entry: o.entry, sl: o.sl, tp1: o.tp1 }, [userId], m)
+}
