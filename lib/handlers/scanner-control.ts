@@ -3,6 +3,7 @@
 //   receive_off: this member's switch goes off. The scanner keeps running for others; it stops only when nobody is receiving.
 // Anyone with an active plan (or the admin) may use these. Start and Stop are kept as aliases for the same two actions.
 import { dbHeaders, env, userFromJwt } from '../_auth.js'
+import { hashKey } from './signals-key.js'
 
 interface Req { method?: string; headers: Record<string, string | undefined>; body?: { action?: string } }
 interface Res { status(c: number): Res; json(b: unknown): void }
@@ -29,9 +30,17 @@ async function activeRunIds(repo: string, token: string, workflow: string = WORK
 }
 
 export default async function handler(req: Req, res: Res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'POST only.' })
+  if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).json({ error: 'GET for status, POST for start and stop.' })
   try {
-    const user = await userFromJwt((req.headers.authorization ?? '').replace('Bearer ', ''))
+    // a member's own API key (fxd_...) or a sign-in token both work here
+    const bearer = (req.headers.authorization ?? '').replace('Bearer ', '').trim()
+    let user: { id: string } | null = null
+    if (bearer.startsWith('fxd_')) {
+      const hits = (await (await fetch(`${env().sb}/rest/v1/user_settings?data->>signals_key_hash=eq.${hashKey(bearer)}&select=user_id`, { headers: dbHeaders() })).json()) as { user_id: string }[]
+      user = hits[0]?.user_id ? { id: hits[0].user_id } : null
+    } else {
+      user = await userFromJwt(bearer)
+    }
     if (!user) return res.status(401).json({ error: 'Please sign in again.' })
     const { sb } = env(), h = dbHeaders()
     const prof = (await (await fetch(`${sb}/rest/v1/profiles?id=eq.${user.id}&select=role`, { headers: h })).json()) as { role: string }[]
@@ -68,6 +77,18 @@ export default async function handler(req: Req, res: Res) {
       } catch { return 0 }
     }
 
+    // GET: is the scanner already running? Check this first. If it is, do NOT start it again: just read /api/signals.
+    if (req.method === 'GET') {
+      const st = (await (await fetch(`${sb}/rest/v1/scanner_state?id=eq.1&select=running,heartbeat`, { headers: h })).json()) as { running: boolean; heartbeat: string | null }[]
+      const beat = st[0]?.heartbeat ? Date.parse(st[0].heartbeat) : 0
+      const ageS = beat ? Math.round((Date.now() - beat) / 1000) : null
+      const alive = !!st[0]?.running && ageS !== null && ageS < 180
+      return res.status(200).json({
+        ok: true, running: alive, last_check_seconds_ago: ageS,
+        note: alive ? 'The scanner is already running. Do not start it again. Just read /api/signals.' : 'The scanner is not running. Start it with POST {"action":"receive_on"}.',
+      })
+    }
+
     const action = req.body?.action === 'start' ? 'receive_on' : req.body?.action === 'stop' ? 'receive_off' : req.body?.action
 
     if (action === 'receive_off') {
@@ -92,7 +113,7 @@ export default async function handler(req: Req, res: Res) {
         await setMine(false)
         return res.status(502).json({ error: `GitHub did not answer (${(e as Error).message}). Your signals were NOT switched on.` })
       }
-      if (active.length) return res.status(200).json({ ok: true, receiving: true, running: true, started: false, note: 'Your signals are on. Connected to the scanner that is already running.' })
+      if (active.length) return res.status(200).json({ ok: true, receiving: true, running: true, started: false, already_running: true, note: 'Your signals are on. Connected to the scanner that is already running. Nothing new was started.' })
       const d = await fetch(`${GH}/repos/${repo}/actions/workflows/${WORKFLOW}/dispatches`, {
         method: 'POST', headers: { ...ghHeaders(token), 'Content-Type': 'application/json' }, body: JSON.stringify({ ref: 'main' }),
       })

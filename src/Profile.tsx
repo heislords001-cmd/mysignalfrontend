@@ -107,6 +107,51 @@ export function SystemCheck() {
   )
 }
 
+
+// Signals API: the member makes their own key here, and uses it from their own program.
+export function ApiAccess() {
+  const [key, setKey] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState('')
+  const [copied, setCopied] = useState(false)
+  const url = typeof window !== 'undefined' ? `${window.location.origin}/api/signals` : '/api/signals'
+  const call = async (action: 'new' | 'revoke') => {
+    setBusy(true); setNote(''); setKey('')
+    const { data } = await supabase.auth.getSession()
+    const res = await fetch('/api/signals-key', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token ?? ''}` },
+      body: JSON.stringify({ action }),
+    })
+    const j = (await res.json().catch(() => ({}))) as { key?: string; note?: string; error?: string }
+    setBusy(false)
+    if (!res.ok) return setNote(j.error ?? 'Could not do that. Try again.')
+    if (j.key) setKey(j.key)
+    setNote(j.note ?? '')
+  }
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(key); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch { /* ignore */ }
+  }
+  return (
+    <div className="card">
+      <h3>Signals API</h3>
+      <p className="mu">Get the latest signals in your own program. Each signal says whether it passed the test (approved: true) or is untested (approved: false).</p>
+      <p className="mu"><b>Address:</b></p>
+      <pre className="code">{url}</pre>
+      <p className="mu"><a href="/signals-api.html" target="_blank" rel="noopener noreferrer">Full Signals API page</a></p>
+      <p className="mu"><b>Example</b> (replace YOUR_KEY). Add <code>?approved_only=1</code> to get only the signals that passed the test:</p>
+      <pre className="code">{`curl -H "Authorization: Bearer YOUR_KEY" "${url}"`}</pre>
+      <button className="btn" onClick={() => call('new')} disabled={busy}>{busy ? 'Working...' : 'Create my key'}</button>
+      {key && <>
+        <p className="mu" style={{ marginTop: 10 }}><b>Your key</b> (copy it now, it is shown only once):</p>
+        <pre className="code" style={{ wordBreak: 'break-all' }}>{key}</pre>
+        <button className="btn sm" onClick={copy}>{copied ? 'Copied' : 'Copy key'}</button>
+      </>}
+      {note && <p className="mu" style={{ marginTop: 8 }}>{note}</p>}
+      <p className="mu" style={{ marginTop: 8 }}>Creating a new key replaces the old one. <button className="btn sm stop" onClick={() => call('revoke')} disabled={busy}>Revoke my key</button></p>
+    </div>
+  )
+}
+
 export default function Profile({ profile, sub, botAccess, refresh }: { profile: P; sub: Sub | null; botAccess: boolean; refresh: () => void }) {
   const admin = profile.role === 'admin'
   const [tab, setTab] = useState<'plan' | 'pay' | 'bot' | 'set'>('plan')
@@ -146,6 +191,7 @@ export default function Profile({ profile, sub, botAccess, refresh }: { profile:
         <span className={activeNow || admin ? 'ok' : 'mu'}>{admin ? 'Full access' : activeAuto ? 'Auto-trading · active' : activeNow ? 'Signals · active' : 'No active plan'}</span></div>
       <div className="seg">{tabs.map(([k, l]) => <button key={k} className={`btn sm ${tab === k ? 'on' : ''}`} onClick={() => setTab(k)}>{l}</button>)}</div>
       {msg && <div className="card"><span className="mu">{msg}</span></div>}
+      <ApiAccess />
 
       {tab === 'plan' && <>
         {(['signals', 'auto'] as PlanId[]).map((id) => {

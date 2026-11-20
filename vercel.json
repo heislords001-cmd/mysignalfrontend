@@ -34,6 +34,14 @@
     {
       "source": "/api/exness-execute",
       "destination": "/api/exness?op=execute"
+    },
+    {
+      "source": "/api/signals",
+      "destination": "/api/system?op=signals"
+    },
+    {
+      "source": "/api/signals-key",
+      "destination": "/api/system?op=signals-key"
     }
   ]
 }

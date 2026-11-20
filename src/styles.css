@@ -186,3 +186,5 @@ img, svg, video { max-width:100%; height:auto; }
 
 /* site tag at the end of every page */
 .site-tag { text-align:center; font-size:11px; color:var(--mu); padding:18px 12px 8px; letter-spacing:.02em; }
+
+.code { background:var(--rs); border:1px solid var(--ln); border-radius:10px; padding:10px; font-size:12px; overflow-x:auto; white-space:pre-wrap; word-break:break-all; }

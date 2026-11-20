@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FX Desk · Signals API</title>
+<style>
+  :root { color-scheme: dark; --bg:#0a0a0a; --sf:#111111; --rs:#171717; --ln:#262626; --tx:#ececf0; --mu:#8c8c97; --ac:#4d8dff; --buy:#2fbf71; --sell:#ee5a5f; --brown:#d9922e; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--tx); font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; line-height:1.5; }
+  main { max-width:720px; margin:0 auto; padding:24px 16px 56px; }
+  h1 { font-size:24px; margin:8px 0 4px; }
+  h2 { font-size:17px; margin:28px 0 8px; border-top:1px solid var(--ln); padding-top:18px; }
+  p, li { color:var(--tx); font-size:14px; }
+  .mu { color:var(--mu); font-size:13px; }
+  code, pre { font-family: ui-monospace, Menlo, Consolas, monospace; font-size:12.5px; }
+  pre { background:var(--sf); border:1px solid var(--ln); border-radius:12px; padding:12px; overflow-x:auto; white-space:pre-wrap; word-break:break-all; }
+  .card { background:var(--sf); border:1px solid var(--ln); border-radius:14px; padding:14px 16px; margin:12px 0; }
+  .tag { display:inline-block; font-size:11px; font-weight:700; padding:3px 8px; border-radius:7px; }
+  .ok { background:#12301f; color:var(--buy); } .no { background:#34171a; color:var(--sell); }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  td, th { text-align:left; padding:8px 6px; border-top:1px solid var(--ln); vertical-align:top; }
+  th { color:var(--mu); font-weight:600; }
+  a { color:var(--ac); }
+  .warn { border-color: var(--brown); }
+</style>
+</head>
+<body>
+<main>
+  <div class="mu">FX Desk</div>
+  <h1>Signals API</h1>
+  <p class="mu">Read the latest signals from your own program. Works for members with an active plan.</p>
+
+  <h2>1. Get your key</h2>
+  <div class="card">
+    <p>Sign in on the site, open the <b>Profile</b> tab, and tap <b>Create my key</b>. Copy the key straight away: it is shown only once.</p>
+    <p class="mu">Your key only works while your plan is active. Creating a new key replaces the old one. <b>Revoke my key</b> stops it at any time.</p>
+  </div>
+
+  <h2>2. Address</h2>
+  <pre>GET /api/signals</pre>
+
+  <h2>3. Send your key</h2>
+  <p>Put the key in the <code>Authorization</code> header:</p>
+  <pre>Authorization: Bearer YOUR_KEY</pre>
+
+  <p><b>curl</b></p>
+  <pre>curl -H "Authorization: Bearer YOUR_KEY" "https://mysignalfrontend.vercel.app/api/signals"</pre>
+
+  <p><b>Python</b></p>
+<pre>import requests
+
+r = requests.get(
+    "https://mysignalfrontend.vercel.app/api/signals",
+    headers={"Authorization": "Bearer YOUR_KEY"},
+    params={"approved_only": 1},   # leave out to include untested signals
+    timeout=20,
+)
+data = r.json()
+for s in data["signals"]:
+    print(s["symbol"], s["side"], s["entry"], s["sl"], s["tp1"], "approved" if s["approved"] else "untested")</pre>
+
+  <h2>4. Options</h2>
+  <table>
+    <tr><th>Option</th><th>What it does</th></tr>
+    <tr><td><code>approved_only=1</code></td><td>Only signals that passed the test. Leave it out to include untested signals too.</td></tr>
+  </table>
+
+  <h2>5. What you get back</h2>
+  <pre>{
+  "ok": true,
+  "count": 2,
+  "signals": [
+    {
+      "symbol": "EURUSD",
+      "side": "buy",
+      "timeframe": "M15",
+      "strategy": "trend_pullback",
+      "entry": 1.10040,
+      "sl": 1.09800,
+      "tp1": 1.10600,
+      "tp2": 1.10900,
+      "approved": true,
+      "agreement": "H1 agrees · H4 agrees",
+      "risk_warning": null,
+      "expires_at": "2026-11-20T14:00:00+00:00",
+      "created_at": "2026-11-20T12:00:00+00:00"
+    }
+  ],
+  "note": "..."
+}</pre>
+  <ul>
+    <li><b>approved</b>: <code>true</code> means the strategy passed the test. <code>false</code> means it is untested.</li>
+    <li><b>sl, tp1, tp2</b>: the stop and targets from the scanner. Size them to your own account.</li>
+    <li><b>risk_warning</b>: set when the stop costs more than the budget at the smallest lot.</li>
+    <li><b>Only the last 24 hours</b> of signals are returned, up to 30 at a time.</li>
+  </ul>
+
+  <h2>Start the scanner (so signals keep coming when you are offline)</h2>
+  <p>The scanner runs on GitHub. It only runs while someone has signals switched on, so you start it with your key. Once it is running, you don't need to be online. Signals keep being saved while it runs, and you read them with <code>GET /api/signals</code> whenever you like.</p>
+
+  <div class="card">
+    <p><b>Check first.</b> Before you start anything, ask whether the scanner is already running:</p>
+<pre>curl -H "Authorization: Bearer YOUR_KEY" "https://mysignalfrontend.vercel.app/api/scanner-control"</pre>
+    <p class="mu">If <code>running</code> is <code>true</code>, do not start it. It is already dropping signals, so just read <code>/api/signals</code>. Only start it when <code>running</code> is <code>false</code>. If you start it anyway while it is running, you are simply connected to the same run: no second scanner is started.</p>
+  </div>
+
+  <p><b>Start</b> (only when it is not running)</p>
+<pre>curl -X POST -H "Authorization: Bearer YOUR_KEY" -H "Content-Type: application/json" \
+  -d '{"action":"receive_on"}' "https://mysignalfrontend.vercel.app/api/scanner-control"</pre>
+
+  <p><b>Stop</b> (your signals switch off; the scanner stops only when nobody else is receiving)</p>
+<pre>curl -X POST -H "Authorization: Bearer YOUR_KEY" -H "Content-Type: application/json" \
+  -d '{"action":"receive_off"}' "https://mysignalfrontend.vercel.app/api/scanner-control"</pre>
+
+  <p>The reply tells you whether it is running:</p>
+<pre>{ "ok": true, "receiving": true, "running": true, "started": false,
+  "note": "Your signals are on. Connected to the scanner that is already running." }</pre>
+
+  <div class="card">
+    <p><b>How long it runs.</b> One scanner run lasts up to about 5.5 hours, then it stops on its own. Check <code>running</code> in the reply, and if it is <code>false</code> start it again with the same call. Starting it while it is already running just connects you to it, so it is safe to call again.</p>
+    <p class="mu">Only one scanner ever runs at a time, however many keys start it.</p>
+  </div>
+
+  <h2>Errors</h2>
+  <table>
+    <tr><th>Status</th><th>Meaning</th></tr>
+    <tr><td><span class="tag no">401</span></td><td>The key is missing or wrong. Create a new key on the Profile tab.</td></tr>
+    <tr><td><span class="tag no">403</span></td><td>Your plan is not active. Renew it, then try again.</td></tr>
+    <tr><td><span class="tag no">405</span></td><td>Use GET.</td></tr>
+  </table>
+
+  <h2>Important</h2>
+  <div class="card warn">
+    <p><b>Untested signals have lost money in every backtest so far.</b> If you trade from this feed, use <code>approved_only=1</code>, and never share your key. Anyone with your key can read the signals on your plan.</p>
+  </div>
+
+  <p class="mu">Questions? <a href="https://44thstudio.my.id" target="_blank" rel="noopener noreferrer">44thstudio.my.id</a></p>
+</main>
+</body>
+</html>
