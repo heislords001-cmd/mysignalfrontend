@@ -118,7 +118,7 @@ export function ApiAccess() {
   const call = async (action: 'new' | 'revoke') => {
     setBusy(true); setNote(''); setKey('')
     const { data } = await supabase.auth.getSession()
-    const res = await fetch('/api/signals-key', {
+    const res = await fetch('/api/system?op=signals-key', {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token ?? ''}` },
       body: JSON.stringify({ action }),
     })
@@ -137,7 +137,6 @@ export function ApiAccess() {
       <p className="mu">Get the latest signals in your own program. Each signal says whether it passed the test (approved: true) or is untested (approved: false).</p>
       <p className="mu"><b>Address:</b></p>
       <pre className="code">{url}</pre>
-      <p className="mu"><a href="/signals-api.html" target="_blank" rel="noopener noreferrer">Full Signals API page</a></p>
       <p className="mu"><b>Example</b> (replace YOUR_KEY). Add <code>?approved_only=1</code> to get only the signals that passed the test:</p>
       <pre className="code">{`curl -H "Authorization: Bearer YOUR_KEY" "${url}"`}</pre>
       <button className="btn" onClick={() => call('new')} disabled={busy}>{busy ? 'Working...' : 'Create my key'}</button>
@@ -152,9 +151,59 @@ export function ApiAccess() {
   )
 }
 
+
+// The Signals API docs, shown on their own tab in Profile.
+export function ApiDocs() {
+  const base = typeof window !== 'undefined' ? window.location.origin : 'https://mysignalfrontend.vercel.app'
+  const sig = `${base}/api/signals`
+  const ctl = `${base}/api/scanner-control`
+  return (
+    <div className="card">
+      <h3>How to use the Signals API</h3>
+      <p className="mu">Create your key above, then use it from your own program. Keep the key private: anyone with it can read your signals.</p>
+
+      <h3 style={{ marginTop: 14 }}>1. Check if the scanner is running</h3>
+      <p className="mu">Ask first. If it is running, do not start it again: it is already dropping signals, so just read them.</p>
+      <pre className="code">{`curl -H "Authorization: Bearer YOUR_KEY" "${ctl}"`}</pre>
+
+      <h3 style={{ marginTop: 14 }}>2. Start it only if it is not running</h3>
+      <pre className="code">{`curl -X POST -H "Authorization: Bearer YOUR_KEY" -H "Content-Type: application/json" -d '{"action":"receive_on"}' "${ctl}"`}</pre>
+      <p className="mu">If it is already running, this connects you to the same run. No new scanner is started. A run lasts up to about 5.5 hours, so check again when it stops.</p>
+
+      <h3 style={{ marginTop: 14 }}>3. Read the signals</h3>
+      <pre className="code">{`curl -H "Authorization: Bearer YOUR_KEY" "${sig}"`}</pre>
+      <p className="mu">Add <code>?approved_only=1</code> to get only the signals that passed the test. Without it you also get untested signals, marked approved: false.</p>
+
+      <h3 style={{ marginTop: 14 }}>Python</h3>
+      <pre className="code">{`import requests
+
+KEY = "YOUR_KEY"
+H = {"Authorization": f"Bearer {KEY}"}
+
+status = requests.get("${ctl}", headers=H, timeout=20).json()
+if not status["running"]:
+    requests.post("${ctl}", headers=H, json={"action": "receive_on"}, timeout=60)
+
+data = requests.get("${sig}", headers=H, params={"approved_only": 1}, timeout=20).json()
+for s in data["signals"]:
+    print(s["symbol"], s["side"], s["entry"], s["sl"], s["tp1"], "approved" if s["approved"] else "untested")`}</pre>
+
+      <h3 style={{ marginTop: 14 }}>What a signal contains</h3>
+      <p className="mu">symbol, side (buy or sell), timeframe, strategy, entry, sl (stop loss), tp1 and tp2 (targets), approved (true if it passed the test), agreement (higher timeframes), risk_warning (set when the stop costs more than your budget at the smallest lot), created_at and expires_at. Only the last 24 hours are returned, up to 30 at a time.</p>
+
+      <h3 style={{ marginTop: 14 }}>Errors</h3>
+      <p className="mu">401: the key is missing or wrong. Create a new one above. 403: your plan is not active. 405: wrong method, use GET for reading and POST for starting.</p>
+
+      <div className="card warn" style={{ marginTop: 14 }}>
+        <p className="mu"><b>Untested signals have lost money in every backtest so far.</b> If your program trades from this feed, use <code>approved_only=1</code>.</p>
+      </div>
+    </div>
+  )
+}
+
 export default function Profile({ profile, sub, botAccess, refresh }: { profile: P; sub: Sub | null; botAccess: boolean; refresh: () => void }) {
   const admin = profile.role === 'admin'
-  const [tab, setTab] = useState<'plan' | 'pay' | 'bot' | 'set'>('plan')
+  const [tab, setTab] = useState<'plan' | 'pay' | 'bot' | 'set' | 'api'>('plan')
   const [pays, setPays] = useState<Payment[]>([])
   const [acct, setAcct] = useState<BotAccount | null>(null)
   const [msg, setMsg] = useState('')
@@ -183,7 +232,7 @@ export default function Profile({ profile, sub, botAccess, refresh }: { profile:
 
   const activeNow = !!sub && new Date(sub.expires_at) > new Date()
   const activeAuto = activeNow && sub?.plan === 'auto'
-  const tabs: ['plan' | 'pay' | 'bot' | 'set', string][] = [['plan', 'Plan'], ['pay', 'Payments'], ['bot', 'Bot access'], ...(botAccess ? [['set', 'Settings'] as ['set', string]] : [])]
+  const tabs: ['plan' | 'pay' | 'bot' | 'set' | 'api', string][] = [['plan', 'Plan'], ['pay', 'Payments'], ['bot', 'Bot access'], ['api', 'Signals API'], ...(botAccess ? [['set', 'Settings'] as ['set' | 'api', string]] : [])]
   const online = !!acct?.updated_at && Date.now() - new Date(acct.updated_at).getTime() < 30000
   return (
     <>
@@ -191,7 +240,7 @@ export default function Profile({ profile, sub, botAccess, refresh }: { profile:
         <span className={activeNow || admin ? 'ok' : 'mu'}>{admin ? 'Full access' : activeAuto ? 'Auto-trading · active' : activeNow ? 'Signals · active' : 'No active plan'}</span></div>
       <div className="seg">{tabs.map(([k, l]) => <button key={k} className={`btn sm ${tab === k ? 'on' : ''}`} onClick={() => setTab(k)}>{l}</button>)}</div>
       {msg && <div className="card"><span className="mu">{msg}</span></div>}
-      <ApiAccess />
+      {tab === 'api' && <><ApiAccess /><ApiDocs /></>}
 
       {tab === 'plan' && <>
         {(['signals', 'auto'] as PlanId[]).map((id) => {

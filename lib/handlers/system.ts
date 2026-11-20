@@ -10,7 +10,10 @@ export const config = { maxDuration: 30 }
 
 export default async function handler(req: Req, res: Res) {
   const q = req.query?.op
-  const op = (Array.isArray(q) ? q[0] : q) ?? new URL(req.url ?? '/', 'http://x').searchParams.get('op') ?? ''
+  const path = new URL(req.url ?? '/', 'http://x').pathname
+  // operation from ?op=, or from the path (/api/signals-key) if the rewrite did not pass it on
+  const fromPath = path.endsWith('/signals-key') ? 'signals-key' : path.endsWith('/signals') ? 'signals' : path.endsWith('/health') ? 'health' : path.endsWith('/ping') ? 'ping' : ''
+  const op = (Array.isArray(q) ? q[0] : q) ?? new URL(req.url ?? '/', 'http://x').searchParams.get('op') ?? fromPath
   if (op === 'ping') return ping(req as any, res as any)
   if (op === 'health') return health(req as any, res as any)
   if (op === 'signals') return signals(req as any, res as any)
