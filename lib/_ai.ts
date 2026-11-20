@@ -69,7 +69,7 @@ export async function askModel(prompt: string, timeoutMs = 20000): Promise<strin
   return r.ok ? r.text.slice(0, 600) : null
 }
 
-export async function askVision(prompt: string, dataUrl: string, timeoutMs = 45000): Promise<AiResult> {
+export async function askVision(prompt: string, dataUrl: string, timeoutMs = 40000): Promise<AiResult> {
   const ep = aiEndpoint('vision')
   if (!ep) return { ok: false, status: null, model: '', detail: 'No AI provider is set up. Add AI_PROVIDER and its key in Vercel.' }
   return send(ep, [{ role: 'user', content: [{ type: 'text', text: prompt }, imagePart(ep.provider, dataUrl)] }], 700, timeoutMs)

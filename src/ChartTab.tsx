@@ -72,15 +72,27 @@ export default function ChartTab({ uid }: { uid: string }) {
     if (!preview) return
     setBusy(true); setErr(''); setResult(null)
     const { data } = await supabase.auth.getSession()
-    const res = await fetch('/api/chart-read', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token ?? ''}` },
-      body: JSON.stringify({ image: preview }),
-    })
-    const j = (await res.json().catch(() => ({}))) as any
-    setBusy(false)
-    if (!res.ok) return setErr(j.error ?? `The chart read failed (status ${res.status}).`)
-    setResult(j); loadHistory()
+    // never wait forever: stop after 55 seconds and say so
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 55000)
+    try {
+      const res = await fetch('/api/chart-read', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token ?? ''}` },
+        body: JSON.stringify({ image: preview }),
+        signal: ctrl.signal,
+      })
+      const j = (await res.json().catch(() => ({}))) as any
+      if (!res.ok) return setErr(j.error ?? `The chart read failed (status ${res.status}).`)
+      setResult(j); loadHistory()
+    } catch (e) {
+      setErr((e as Error).name === 'AbortError'
+        ? 'The chart reader took too long and was stopped. Try again. If it keeps happening, the model is too slow: set AI_VISION_MODEL in Vercel to a faster vision model.'
+        : 'The chart could not be read. Check your connection and try again.')
+    } finally {
+      clearTimeout(timer)
+      setBusy(false)
+    }
   }
 
   const remove = async (id: number) => {

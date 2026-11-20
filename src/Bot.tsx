@@ -418,7 +418,11 @@ export default function Bot({ uid, admin = false, botAccess, goPlan }: { uid: st
     }
     await setScalp(true, true)
     await run({ bot_on: true })
-    setBotNote(j.note ?? 'The bot is on.')
+    // Start bot places its first trade now, through the same path as the test trade button (one trade, demo only).
+    setBotNote('The bot is on. Placing the first trade...')
+    const t = await fetch('/api/test-trade', { method: 'POST', headers })
+    const tj = (await t.json().catch(() => ({}))) as { message?: string; error?: string; ok?: boolean }
+    setBotNote(`${j.note ?? 'The bot is on.'} ${tj.message ?? tj.error ?? ''}`.trim())
   }
   const stopBot = async () => {
     setBotNote('Stopping the bot...')
