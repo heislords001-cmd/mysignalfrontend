@@ -201,7 +201,7 @@ for s in data["signals"]:
   )
 }
 
-export default function Profile({ profile, sub, botAccess, refresh }: { profile: P; sub: Sub | null; botAccess: boolean; refresh: () => void }) {
+export default function Profile({ profile, sub, botAccess, refresh, paymentsOn, setPaymentsOn }: { profile: P; sub: Sub | null; botAccess: boolean; refresh: () => void; paymentsOn: boolean; setPaymentsOn: (v: boolean) => void }) {
   const admin = profile.role === 'admin'
   const [tab, setTab] = useState<'plan' | 'pay' | 'bot' | 'set' | 'api'>('plan')
   const [pays, setPays] = useState<Payment[]>([])
@@ -232,7 +232,16 @@ export default function Profile({ profile, sub, botAccess, refresh }: { profile:
 
   const activeNow = !!sub && new Date(sub.expires_at) > new Date()
   const activeAuto = activeNow && sub?.plan === 'auto'
-  const tabs: ['plan' | 'pay' | 'bot' | 'set' | 'api', string][] = [['plan', 'Plan'], ['pay', 'Payments'], ['bot', 'Bot access'], ['api', 'Signals API'], ...(botAccess ? [['set', 'Settings'] as ['set' | 'api', string]] : [])]
+  const FREE = !paymentsOn
+  const isAdmin = profile.role === 'admin'
+  const [switchMsg, setSwitchMsg] = useState('')
+  const flipPayments = async () => {
+    const { data } = await supabase.auth.getSession()
+    const res = await fetch('/api/system?op=payments', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token ?? ''}` }, body: JSON.stringify({ on: !paymentsOn }) })
+    const j = (await res.json().catch(() => ({}))) as { payments_on?: boolean; note?: string; error?: string }
+    if (res.ok) { setPaymentsOn(!!j.payments_on); setSwitchMsg(j.note ?? '') } else setSwitchMsg(j.error ?? 'Could not switch payments.')
+  }
+  const tabs: ['plan' | 'pay' | 'bot' | 'set' | 'api', string][] = [['plan', 'Plan'], ...(FREE ? [] : [['pay', 'Payments'] as ['pay', string]]), ['bot', 'Bot access'], ['api', 'Signals API'], ...(botAccess ? [['set', 'Settings'] as ['set' | 'api', string]] : [])]
   const online = !!acct?.updated_at && Date.now() - new Date(acct.updated_at).getTime() < 30000
   return (
     <>
@@ -242,7 +251,9 @@ export default function Profile({ profile, sub, botAccess, refresh }: { profile:
       {msg && <div className="card"><span className="mu">{msg}</span></div>}
       {tab === 'api' && <><ApiAccess /><ApiDocs /></>}
 
-      {tab === 'plan' && <>
+      {tab === 'plan' && isAdmin && <div className="card"><b>Payments: {paymentsOn ? 'ON' : 'OFF'}</b><div className="mu" style={{ marginTop: 4 }}>Off: everyone who signs in has free access. On: plans apply. Turning it on keeps every existing account free.</div><button className="btn" style={{ marginTop: 8 }} onClick={flipPayments}>Turn payments {paymentsOn ? 'off' : 'on'}</button>{switchMsg && <div className="mu" style={{ marginTop: 6 }}>{switchMsg}</div>}</div>}
+      {tab === 'plan' && FREE && <div className="card"><b>Free access for now</b><div className="mu">Payments are paused. Everyone who signs in has full access.</div></div>}
+      {tab === 'plan' && !FREE && <>
         {(['signals', 'auto'] as PlanId[]).map((id) => {
           const mine = activeNow && sub?.plan === id
           return (

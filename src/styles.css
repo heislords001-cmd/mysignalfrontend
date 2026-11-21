@@ -188,3 +188,8 @@ img, svg, video { max-width:100%; height:auto; }
 .site-tag { text-align:center; font-size:11px; color:var(--mu); padding:18px 12px 8px; letter-spacing:.02em; }
 
 .code { background:var(--rs); border:1px solid var(--ln); border-radius:10px; padding:10px; font-size:12px; overflow-x:auto; white-space:pre-wrap; word-break:break-all; }
+
+/* bottom bar sits lower, closer to the edge */
+.tabs { bottom: 2px !important; }
+.app { padding-bottom: 96px; }
+.input { display:block; width:100%; margin:8px 0; padding:10px 12px; border-radius:10px; border:1px solid var(--ln); background:var(--rs); color:var(--tx); font-size:14px; }

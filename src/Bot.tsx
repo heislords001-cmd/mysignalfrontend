@@ -233,6 +233,99 @@ export function TradeSettings({ uid, admin }: { uid: string; admin: boolean }) {
 
 
 // Trades placed in the last minute, and trades placed since Start bot was pressed (this run).
+
+// The MetaTrader 5 Expert Advisor: a download and the setup steps. It runs in MT5 on a Windows computer, not on this site.
+
+// Pick the pairs the EA trades on. The VPS reads this choice.
+export function EaPairs() {
+  const [picked, setPicked] = useState<string[]>([])
+  const [all, setAll] = useState<string[]>([])
+  const [msg, setMsg] = useState('')
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.auth.getSession()
+      const res = await fetch('/api/system?op=ea-config', { headers: { Authorization: `Bearer ${data.session?.access_token ?? ''}` } })
+      const j = (await res.json().catch(() => ({}))) as { pairs?: string[]; available?: string[] }
+      setPicked(j.pairs ?? []); setAll(j.available ?? [])
+    })()
+  }, [])
+  const toggle = (p: string) => setPicked((cur) => cur.includes(p) ? cur.filter((x) => x !== p) : [...cur, p])
+  const save = async () => {
+    setBusy(true); setMsg('')
+    const { data } = await supabase.auth.getSession()
+    const res = await fetch('/api/system?op=ea-config', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token ?? ''}` },
+      body: JSON.stringify({ pairs: picked }),
+    })
+    const j = (await res.json().catch(() => ({}))) as { note?: string; error?: string }
+    setBusy(false)
+    setMsg(res.ok ? (j.note ?? 'Saved.') : (j.error ?? 'Could not save.'))
+  }
+  return (
+    <div className="card">
+      <h3>Pairs for the EA</h3>
+      <p className="mu">Tick the pairs the EA should trade. Each one gets its own chart on your VPS. Start with two or three.</p>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '8px 0' }}>
+        {all.map((p) => (
+          <button key={p} className={`btn sm ${picked.includes(p) ? 'on' : ''}`} onClick={() => toggle(p)}>{picked.includes(p) ? '✓ ' : ''}{p}</button>
+        ))}
+      </div>
+      <button className="btn" onClick={save} disabled={busy}>{busy ? 'Saving...' : 'Save pairs'}</button>
+      {msg && <p className="mu" style={{ marginTop: 8 }}>{msg}</p>}
+    </div>
+  )
+}
+
+export function Mt5Ea() {
+  return (
+    <div className="card">
+      <h3>MetaTrader 5 Expert Advisor</h3>
+      <p className="mu">The same four strategies, running inside MetaTrader 5 on a Windows computer. It trades your MT5 demo account. It does not run on this site, and its trades do not show in the lists above.</p>
+      <p className="mu"><b>Demo only.</b> The EA refuses to run on a real account unless you change a setting yourself.</p>
+      <a className="btn" href="/downloads/FXDesk_Strategies.mq5" download>Download the EA (.mq5)</a>
+      <h3 style={{ marginTop: 14 }}>Setup</h3>
+      <ol className="mu" style={{ paddingLeft: 18, lineHeight: 1.6 }}>
+        <li>Install MetaTrader 5 on a Windows computer and log in to a demo account.</li>
+        <li>In MT5, open File, then Open Data Folder, then MQL5, then Experts. Copy the downloaded file into that folder.</li>
+        <li>Open MetaEditor from the MT5 toolbar, open the file, and press Compile. Fix any errors it reports.</li>
+        <li>Back in MT5, open a chart on the pair you want, drag the EA onto it, and allow automated trading.</li>
+        <li>Check the inputs. Defaults: clusters of up to 10 positions at 0.01 lots, $0.20 profit to close each one, a basket stop at 10% of balance, a daily cap at 20%, demo only.</li>
+        <li>Test it on the demo account for a while before you leave it running.</li>
+      </ol>
+      <p className="mu">The MT5 terminal has to stay open for the EA to trade. If your computer is off, it stops.</p>
+    </div>
+  )
+}
+
+
+// MT5 trades the Expert Advisor reported: open and closed, newest first.
+export function Mt5Trades({ uid }: { uid: string }) {
+  const [rows, setRows] = useState<any[]>([])
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase.from('mt5_trades').select('ticket,symbol,side,lots,entry,sl,tp,strategy,status,profit,opened_at,closed_at').eq('user_id', uid).order('created_at', { ascending: false }).limit(20)
+      setRows(data ?? [])
+    }
+    load()
+    const t = setInterval(load, 15000)
+    return () => clearInterval(t)
+  }, [uid])
+  return (
+    <div className="card">
+      <h3>MT5 trades (from the Expert Advisor)</h3>
+      {rows.length === 0 && <p className="mu">No MT5 trades yet. They appear here once the EA is running on your VPS and has opened a trade.</p>}
+      {rows.map((r) => (
+        <div key={r.ticket} className="mu" style={{ padding: '6px 0', borderTop: '1px solid var(--ln)' }}>
+          <b>{r.symbol} {r.side}</b> · {r.lots} lots · {r.status === 'open' ? 'open' : 'closed'}
+          {r.profit != null && r.status === 'closed' && <span style={{ color: Number(r.profit) >= 0 ? 'var(--buy)' : 'var(--sell)' }}> · {Number(r.profit) >= 0 ? '+' : ''}${Number(r.profit).toFixed(2)}</span>}
+          <div style={{ fontSize: 11 }}>entry {r.entry} · stop {r.sl ?? '-'} · target {r.tp ?? '-'}{r.strategy ? ` · ${r.strategy}` : ''}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function LiveTrades({ uid }: { uid: string }) {
   const [minute, setMinute] = useState<Exec[]>([])
   const [run, setRun] = useState<Exec[]>([])
@@ -440,6 +533,8 @@ export default function Bot({ uid, admin = false, botAccess, goPlan }: { uid: st
       </div>
 
       {sec === 'control' && <>
+        <EaPairs />
+        <Mt5Ea />
         <DerivLink uid={uid} onLink={setLinked} />
         <ExnessLink uid={uid} />
       <div className="card">
@@ -494,6 +589,9 @@ export default function Bot({ uid, admin = false, botAccess, goPlan }: { uid: st
       </>}
       {sec === 'settings' && !linked && <p className="mu">Connect an account in Control first.</p>}
 
+      {sec === 'trades' && <>
+        <Mt5Trades uid={uid} />
+      </>}
       {sec === 'trades' && linked && <>
         <LiveTrades uid={uid} />
       {linked && <ExecList uid={uid} />}

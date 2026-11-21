@@ -1,3 +1,4 @@
+import { freeAccess } from '../_free.js'
 // GET /api/signals: the latest approved signals, for members with an active plan. Untested signals are never returned.
 import { dbHeaders, env, userFromJwt } from '../_auth.js'
 import { hashKey } from './signals-key.js'
@@ -27,7 +28,7 @@ export default async function handler(req: Req & { query?: Record<string, unknow
     if (!user) return res.status(401).json({ error: 'Send your API key or your sign-in token as Authorization: Bearer <value>.' })
     const sub = (await (await fetch(`${sb}/rest/v1/subscriptions?user_id=eq.${user.id}&select=expires_at`, { headers: h })).json()) as { expires_at: string }[]
     const prof = (await (await fetch(`${sb}/rest/v1/profiles?id=eq.${user.id}&select=role`, { headers: h })).json()) as { role: string }[]
-    const active = prof[0]?.role === 'admin' || (sub[0] && new Date(sub[0].expires_at).getTime() > Date.now())
+    const active = (await freeAccess()) || prof[0]?.role === 'admin' || (sub[0] && new Date(sub[0].expires_at).getTime() > Date.now())
     if (!active) return res.status(403).json({ error: 'Signals need an active plan.' })
   }
   // ?approved_only=1 returns just the signals that passed the test. By default untested signals are included, each marked approved: false.

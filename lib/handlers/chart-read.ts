@@ -1,3 +1,4 @@
+import { freeAccess } from '../_free.js'
 // Optional chart reading. A member uploads a chart screenshot; a vision model describes what it sees.
 // It is an OPINION, never a signal: it does not create signals, executions or trades.
 // Trade levels come only from our own market data (market_state), shown next to the read for reference.
@@ -39,7 +40,7 @@ export default async function handler(req: Req, res: Res) {
     // who may use it: admin, or a member with an active plan
     const prof = (await (await fetch(`${sb}/rest/v1/profiles?id=eq.${user.id}&select=role`, { headers: h })).json()) as { role: string }[]
     const sub = (await (await fetch(`${sb}/rest/v1/subscriptions?user_id=eq.${user.id}&select=plan,expires_at`, { headers: h })).json()) as { plan: string; expires_at: string }[]
-    const allowed = prof[0]?.role === 'admin' || (sub[0] && new Date(sub[0].expires_at).getTime() > Date.now())
+    const allowed = (await freeAccess()) || prof[0]?.role === 'admin' || (sub[0] && new Date(sub[0].expires_at).getTime() > Date.now())
     if (!allowed) return res.status(403).json({ error: 'Chart reading needs an active plan.' })
 
     // the member must have switched the tool on

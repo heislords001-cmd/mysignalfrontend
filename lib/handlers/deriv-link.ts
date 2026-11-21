@@ -1,3 +1,4 @@
+import { freeAccess } from '../_free.js'
 // Vercel function: saves (POST) or removes (DELETE) a member's Deriv API key. The key is encrypted before it is stored
 // and is never sent back to the browser.
 import { encrypt } from '../_crypto.js'
@@ -25,7 +26,7 @@ async function run(req: Req, res: Res) {
   // only admins and members with an active Auto-trading plan may save a key
   const prof = (await (await fetch(`${sb}/rest/v1/profiles?id=eq.${user.id}&select=role`, { headers: db })).json()) as { role: string }[]
   const sub = (await (await fetch(`${sb}/rest/v1/subscriptions?user_id=eq.${user.id}&select=plan,expires_at`, { headers: db })).json()) as { plan: string; expires_at: string }[]
-  const allowed = prof[0]?.role === 'admin' || (sub[0]?.plan === 'auto' && new Date(sub[0].expires_at).getTime() > Date.now())
+  const allowed = (await freeAccess()) || prof[0]?.role === 'admin' || (sub[0]?.plan === 'auto' && new Date(sub[0].expires_at).getTime() > Date.now())
   if (!allowed) return res.status(403).json({ error: 'Auto-trading needs the Signals + Auto-trading plan.' })
 
   if (req.method === 'DELETE') {

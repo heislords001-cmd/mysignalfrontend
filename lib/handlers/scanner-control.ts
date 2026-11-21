@@ -1,3 +1,4 @@
+import { freeAccess } from '../_free.js'
 // Per-member signal switches on one shared scanner.
 //   receive_on:  this member's signals switch on. If the scanner is off, this press starts it for everyone.
 //   receive_off: this member's switch goes off. The scanner keeps running for others; it stops only when nobody is receiving.
@@ -45,7 +46,7 @@ export default async function handler(req: Req, res: Res) {
     const { sb } = env(), h = dbHeaders()
     const prof = (await (await fetch(`${sb}/rest/v1/profiles?id=eq.${user.id}&select=role`, { headers: h })).json()) as { role: string }[]
     const sub = (await (await fetch(`${sb}/rest/v1/subscriptions?user_id=eq.${user.id}&select=plan,expires_at`, { headers: h })).json()) as { plan: string; expires_at: string }[]
-    const allowed = prof[0]?.role === 'admin' || (sub[0] && new Date(sub[0].expires_at).getTime() > Date.now())
+    const allowed = (await freeAccess()) || prof[0]?.role === 'admin' || (sub[0] && new Date(sub[0].expires_at).getTime() > Date.now())
     if (!allowed) return res.status(403).json({ error: 'Signals need an active plan.' })
 
     const token = process.env.GITHUB_SCANNER_TOKEN ?? ''

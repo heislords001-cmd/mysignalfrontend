@@ -1,3 +1,4 @@
+import { freeAccess } from './_free.js'
 // The trading engine, two modes:
 //  1. SIGNAL mode: the scanner saves a signal, and every member with the bot ON gets that trade on their Deriv account.
 //  2. SCALP mode: the scanner saves what it sees on a pair; members who switched scalp mode on get small quick trades while
@@ -35,10 +36,10 @@ async function loadMembers() {
     rest(`profiles?id=${list}&select=id,role`), rest(`subscriptions?user_id=${list}&select=user_id,plan,expires_at`),
     rest(`broker_links?user_id=${list}&select=user_id`), rest(`broker_secrets?user_id=${list}&select=user_id,data`), rest(`user_settings?user_id=${list}&select=user_id,data`),
   ])
-  return { ids, P: group(profiles), S: group(subs), L: group(links), K: group(secrets), U: group(settings) }
+  return { ids, free: await freeAccess(), P: group(profiles), S: group(subs), L: group(links), K: group(secrets), U: group(settings) }
 }
 type Members = NonNullable<Awaited<ReturnType<typeof loadMembers>>>
-const hasPlan = (m: Members, id: string) => m.P.get(id)?.role === 'admin' || (m.S.get(id)?.plan === 'auto' && new Date(m.S.get(id)!.expires_at).getTime() > Date.now())
+const hasPlan = (m: Members, id: string) => m.free || m.P.get(id)?.role === 'admin' || (m.S.get(id)?.plan === 'auto' && new Date(m.S.get(id)!.expires_at).getTime() > Date.now())
 
 export function checkSignal(s: Signal): string | null {
   if (!s || !SYMBOLS[s.symbol]) return 'unknown symbol'
