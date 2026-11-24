@@ -193,3 +193,25 @@ img, svg, video { max-width:100%; height:auto; }
 .tabs { bottom: 2px !important; }
 .app { padding-bottom: 96px; }
 .input { display:block; width:100%; margin:8px 0; padding:10px 12px; border-radius:10px; border:1px solid var(--ln); background:var(--rs); color:var(--tx); font-size:14px; }
+
+/* typography: Inter for text, JetBrains Mono for numbers */
+:root { --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace; }
+body { letter-spacing: -0.005em; }
+
+/* ---- glossy blue (like water in glass) ---- */
+:root { --gloss-blue: linear-gradient(180deg, #9cc4ff 0%, #4f8dff 38%, #2d63e0 70%, #1f4fbf 100%); }
+.btn.p, .btn.start {
+  background: var(--gloss-blue) !important; border-color: #3a6fe6 !important; color: #fff !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.55), inset 0 -2px 4px rgba(0,20,80,.25), 0 6px 18px rgba(61,123,255,.38);
+  text-shadow: 0 1px 1px rgba(0,20,80,.35);
+}
+.brand .logo, .logo { background: var(--gloss-blue) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 4px 12px rgba(61,123,255,.35); }
+.tabs button.on { background: radial-gradient(120% 90% at 50% 0%, #9cc4ff 0%, #3d7bff 55%, #2450c4 100%) !important; color:#fff !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 4px 14px rgba(61,123,255,.35) !important; }
+.meter span { background: var(--gloss-blue) !important; }
+/* ---- account size ---- */
+.acct-grid { display:grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap:8px; margin-top:10px; }
+.acct-opt { padding:10px 0; border-radius:12px; border:1px solid var(--ln); background:var(--rs); color:var(--tx); font-family:var(--mono); font-size:13px; }
+.acct-opt.on { background: var(--gloss-blue); color:#fff; border-color:#3a6fe6; }
+.acct-chip { display:flex; justify-content:space-between; align-items:center; gap:8px; background:var(--sf); border:1px solid var(--ln); border-radius:14px; padding:10px 12px; font-size:13px; }
+.sizeline { font-size:12px; color:var(--mu); margin-top:6px; }
+.sizeline b { color:var(--tx); font-family:var(--mono); }

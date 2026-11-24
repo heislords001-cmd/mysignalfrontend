@@ -80,7 +80,7 @@ export function CopyButton({ text }: { text: string }) {
   return <button className="btn sm copy-btn" onClick={copy} aria-label="Copy signal">{done ? 'Copied' : 'Copy'}</button>
 }
 
-export function SignalCard({ s }: { s: Signal }) {
+export function SignalCard({ s, account, plan }: { s: Signal; account?: number; plan?: { lot: number; risk_pct: number } }) {
   const sl = s.sl ?? s.runner_sl, tp1 = s.tp1 ?? s.scalp_tp
   const live = !s.outcome && !!s.expires_at && new Date(s.expires_at).getTime() > Date.now()
   const r = s.result_r ?? 0
@@ -112,6 +112,7 @@ export function SignalCard({ s }: { s: Signal }) {
         <div className="pill sl"><span className="pl">STOP</span><span className="pv">{sl ?? '-'}</span></div>
         {tp1 != null && <div className="pill tp"><span className="pl">TP1</span><span className="pv">{tp1}</span></div>}
       </div>
+      {account != null && !s.outcome && <SizeLine s={s} account={account} riskPct={plan ? plan.risk_pct / 100 : undefined} capLot={plan?.lot} />}
       {s.risk_warning && <div className="warn">⚠ {s.risk_warning}</div>}
       {s.agreement && <div className="meta">Timeframes: {s.agreement}</div>}
       {s.ai_note && <div className="note">{s.ai_note}</div>}
@@ -121,4 +122,26 @@ export function SignalCard({ s }: { s: Signal }) {
       </div>
     </div>
   )
+}
+
+// The lot size and risk for one signal on one account. Mirrors the scanner's dollar maths (account_risk.py).
+export function sizing(s: Signal, account: number, riskPct = 0.10, capLot?: number) {
+  if (s.sl == null) return null
+  const budget = account * riskPct
+  const dist = Math.abs(s.entry - s.sl)
+  const contract = s.symbol === 'XAUUSD' ? 100 : 100000
+  const usdPerUnit = s.symbol.endsWith('USD') ? 1 : s.symbol.startsWith('USD') ? 1 / s.entry : 1
+  const perLot = dist * contract * usdPerUnit
+  if (!(perLot > 0)) return null
+  let lot = Math.floor((budget / perLot) * 100 + 1e-9) / 100   // tiny tolerance so exact sizes are not cut short by rounding
+  if (lot < 0.01) return { ok: false as const, minRisk: 0.01 * perLot, budget }
+  if (capLot != null && lot > capLot) lot = capLot             // never more than the lot size the member stated today
+  return { ok: true as const, lot, risk: lot * perLot, budget }
+}
+
+export function SizeLine({ s, account, riskPct, capLot }: { s: Signal; account: number; riskPct?: number; capLot?: number }) {
+  const z = sizing(s, account, riskPct ?? 0.10, capLot)
+  if (!z) return null
+  if (!z.ok) return <div className="warn">Too wide for ${account} at the smallest lot: 0.01 lots would risk ${z.minRisk.toFixed(2)} (budget ${z.budget.toFixed(2)}). Skip this one.</div>
+  return <div className="sizeline">Your size: <b>{z.lot.toFixed(2)} lots</b> · risks ${z.risk.toFixed(2)} of ${z.budget.toFixed(2)}</div>
 }
