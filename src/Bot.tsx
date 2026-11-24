@@ -501,9 +501,8 @@ export default function Bot({ uid, admin = false, botAccess, goPlan }: { uid: st
     await supabase.from('user_settings').upsert({ user_id: uid, data: { ...((cur?.data ?? {}) as object), scalp_enabled: on, ...extra } }, { onConflict: 'user_id' })
   }
   const startBot = async () => {
-    const { data: pd } = await supabase.from('user_settings').select('data').eq('user_id', uid).maybeSingle()
-    const dp = ((pd?.data ?? {}) as Record<string, any>).daily_plan
-    if (!dp || dp.date !== todayLagos()) { setBotNote("Enter today's lot size and risk on the Home tab first."); return }
+    const { data: dp } = await supabase.from('daily_plans').select('plan_date').eq('user_id', uid).eq('plan_date', todayLagos()).maybeSingle()
+    if (!dp) { setBotNote("Enter today's lot size and risk on the Home tab first."); return }
     setBotNote('Checking the scanner...')
     const { data } = await supabase.auth.getSession()
     const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token ?? ''}` }

@@ -34,9 +34,14 @@ export default function Home({ uid, admin, access, goPlan }: { uid: string; admi
       const d = (data?.data ?? {}) as Record<string, unknown>
       setMine(d.signals_on === true)
       setAccount(typeof d.account_usd === 'number' ? d.account_usd : null)
-      setPlan((d.daily_plan ?? null) as Plan | null)
     })
   }, [uid, busy])
+  // today's plan, read from its own table (one row per member per day)
+  useEffect(() => {
+    supabase.from('daily_plans').select('plan_date,lot,risk_pct').eq('user_id', uid).eq('plan_date', todayLagos()).maybeSingle().then(({ data }) => {
+      setPlan(data ? { date: String(data.plan_date), lot: Number(data.lot), risk_pct: Number(data.risk_pct) } : null)
+    })
+  }, [uid])
   const toggle = async () => {
     setBusy(true); setErr('')
     const { data } = await supabase.auth.getSession()
