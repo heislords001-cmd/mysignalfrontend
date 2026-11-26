@@ -17,10 +17,12 @@ export default function DailyPlan({ uid, account, onSaved }: { uid: string; acco
     if (!RISK_OPTIONS.includes(risk)) { setMsg('Pick a risk from the list.'); return }
     const day = todayLagos()
     const row = { user_id: uid, plan_date: day, lot: Math.round(l * 100) / 100, risk_pct: risk }
-    setBusy(true); setMsg('')
-    const { error } = await supabase.from('daily_plans').upsert(row, { onConflict: 'user_id,plan_date' })
+    setBusy(true); setMsg(`Saving for account ${uid.slice(0, 8)}...`)
+    const { data, error, status } = await supabase.from('daily_plans').upsert(row, { onConflict: 'user_id,plan_date' }).select()
     setBusy(false)
-    if (error) { setMsg(`Not saved: ${error.message}. If this says the table is missing, run migration-15 in Supabase.`); return }
+    if (error) { setMsg(`Not saved (account ${uid.slice(0, 8)}, status ${status}): ${error.message}`); return }
+    if (!data || data.length === 0) { setMsg(`Not saved: the database returned no row (account ${uid.slice(0, 8)}, status ${status}).`); return }
+    setMsg(`Saved for account ${uid.slice(0, 8)}.`)
     onSaved({ date: day, lot: row.lot, risk_pct: risk })
   }
   return (
