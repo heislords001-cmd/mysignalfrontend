@@ -80,7 +80,7 @@ export default function Home({ uid, admin, access, goPlan }: { uid: string; admi
           </div>
           {mine !== undefined && (
             <button className={`btn ${mine ? 'stop' : 'start'}`} onClick={toggle} disabled={busy || (!mine && !todayOk)}>
-              <Icon n={mine ? 'stop' : 'play'} />{mine ? 'Stop scanner' : 'Start scanner'}
+              <Icon n={mine ? 'stop' : 'play'} />{admin ? (mine ? 'Stop scanner' : 'Start scanner') : (mine ? 'Stop receiving' : 'Start receiving')}
             </button>
           )}
         </div>

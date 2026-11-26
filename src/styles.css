@@ -215,3 +215,9 @@ body { letter-spacing: -0.005em; }
 .acct-chip { display:flex; justify-content:space-between; align-items:center; gap:8px; background:var(--sf); border:1px solid var(--ln); border-radius:14px; padding:10px 12px; font-size:13px; }
 .sizeline { font-size:12px; color:var(--mu); margin-top:6px; }
 .sizeline b { color:var(--tx); font-family:var(--mono); }
+
+/* ---- navy gloss (replaces the sky blue) ---- */
+:root { --gloss-blue: linear-gradient(180deg, #2c4f93 0%, #1d3a75 45%, #15305f 78%, #0f2347 100%); --ac: #3a5fa8; }
+.btn.p, .btn.start { background: var(--gloss-blue) !important; border-color: #2a4f93 !important; color: #fff !important; }
+.tabs button.on { background: radial-gradient(120% 90% at 50% 0%, #2c4f93 0%, #1d3a75 60%, #0f2347 100%) !important; }
+.acct-opt.on { border-color: #2a4f93 !important; }

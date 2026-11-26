@@ -46,6 +46,7 @@ export default async function handler(req: Req, res: Res) {
     const { sb } = env(), h = dbHeaders()
     const prof = (await (await fetch(`${sb}/rest/v1/profiles?id=eq.${user.id}&select=role`, { headers: h })).json()) as { role: string }[]
     const sub = (await (await fetch(`${sb}/rest/v1/subscriptions?user_id=eq.${user.id}&select=plan,expires_at`, { headers: h })).json()) as { plan: string; expires_at: string }[]
+    const isAdmin = prof[0]?.role === 'admin'
     const allowed = (await freeAccess()) || prof[0]?.role === 'admin' || (sub[0] && new Date(sub[0].expires_at).getTime() > Date.now())
     if (!allowed) return res.status(403).json({ error: 'Signals need an active plan.' })
 
@@ -94,6 +95,7 @@ export default async function handler(req: Req, res: Res) {
 
     if (action === 'receive_off') {
       await setMine(false)
+      if (!isAdmin) return res.status(200).json({ ok: true, receiving: false, note: 'Signals off for you.' })
       if ((await receivers()) > 0) {
         return res.status(200).json({ ok: true, receiving: false, running: true, note: 'Your signals are off. The scanner keeps running for the others who are receiving.' })
       }
@@ -103,6 +105,12 @@ export default async function handler(req: Req, res: Res) {
 
     if (action === 'receive_on') {
       await setMine(true)
+      if (!isAdmin) {
+        // only the admin starts and stops the scanner; everyone else just receives what it finds
+        const st = (await (await fetch(`${sb}/rest/v1/scanner_state?id=eq.1&select=running`, { headers: h })).json()) as { running: boolean }[]
+        const running = !!st[0]?.running
+        return res.status(200).json({ ok: true, receiving: true, running, note: running ? 'Signals are on for you.' : 'Signals are on for you. The admin has the scanner off right now; signals appear when it is on.' })
+      }
       if (!token) return res.status(200).json({ ok: true, receiving: true, running: false, note: 'Your signals are on, but GITHUB_SCANNER_TOKEN is not set in Vercel, so the scanner was not started.' })
       // only one press can flip the engine from off to on
       const claim = await fetch(`${sb}/rest/v1/scanner_state?id=eq.1&running=eq.false`, { method: 'PATCH', headers: { ...h, Prefer: 'return=representation' }, body: JSON.stringify({ running: true }) })
