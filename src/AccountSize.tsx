@@ -10,7 +10,8 @@ export default function AccountSize({ uid, current, onSaved, onClose }: { uid: s
   const save = async (amount: number) => {
     if (!Number.isFinite(amount) || amount < 10) { setMsg('The smallest account is $10.'); return }
     const { data: cur } = await supabase.from('user_settings').select('data').eq('user_id', uid).maybeSingle()
-    await supabase.from('user_settings').upsert({ user_id: uid, data: { ...((cur?.data ?? {}) as object), account_usd: amount } }, { onConflict: 'user_id' })
+    const { error } = await supabase.from('user_settings').upsert({ user_id: uid, data: { ...((cur?.data ?? {}) as object), account_usd: amount } }, { onConflict: 'user_id' })
+    if (error) { setMsg(`Not saved: ${error.message}. Run migration-16 in Supabase.`); return }
     setMsg(''); setCustom(''); onSaved(amount)
   }
   return (
