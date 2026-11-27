@@ -102,7 +102,7 @@ export default function Home({ uid, admin, access, goPlan }: { uid: string; admi
       <div className="card"><h2>Latest signals</h2>
         {sigs.length === 0 && <p className="mu">No signals yet. They appear when an approved strategy finds a setup.</p>}
         {mine && !todayOk && <p className="mu">Enter today's lot size and risk above to see your signals.</p>}
-        {mine && todayOk ? <div className="cards">{sigs.slice(0, 5).map((s) => <SignalCard key={s.id} s={s} account={account ?? undefined} plan={plan ?? undefined} />)}</div> : !mine ? <p className="mu">Signals are off for your account. Press Start scanner to receive them.</p> : null}
+        {mine && todayOk ? <div className="cards">{[...sigs].sort((a, b) => (b.symbol === 'XAUUSD' ? 1 : 0) - (a.symbol === 'XAUUSD' ? 1 : 0)).slice(0, 5).map((s) => <SignalCard key={s.id} s={s} account={account ?? undefined} plan={plan ?? undefined} />)}</div> : !mine ? <p className="mu">Signals are off for your account. Press Start scanner to receive them.</p> : null}
       </div>
     </>
   )
