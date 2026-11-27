@@ -4,7 +4,7 @@ import { freeAccess } from '../_free.js'
 // Trade levels come only from our own market data (market_state), shown next to the read for reference.
 // The image is used for the one request and is NOT stored. Only the text read is saved.
 import { dbHeaders, env, userFromJwt } from '../_auth.js'
-import { askVision } from '../_ai.js'
+import { askVision, aiEndpoint } from '../_ai.js'
 
 interface Req { method?: string; headers: Record<string, string | undefined>; body?: { image?: string } }
 interface Res { status(c: number): Res; json(b: unknown): void }
@@ -35,7 +35,7 @@ export default async function handler(req: Req, res: Res) {
     const user = await userFromJwt((req.headers.authorization ?? '').replace('Bearer ', ''))
     if (!user) return res.status(401).json({ error: 'Please sign in again.' })
     const { sb } = env(), h = dbHeaders()
-    if (!process.env.NVIDIA_API_KEY) return res.status(500).json({ error: 'NVIDIA_API_KEY is not set in Vercel. Add it as a Secret and redeploy.' })
+    if (!aiEndpoint('vision')) return res.status(500).json({ error: 'No AI model is set up for chart reading. In Vercel add AI_PROVIDER and AI_API_KEY (or NVIDIA_API_KEY / MISTRAL_API_KEY), and AI_VISION_MODEL, then redeploy.' })
 
     // who may use it: admin, or a member with an active plan
     const prof = (await (await fetch(`${sb}/rest/v1/profiles?id=eq.${user.id}&select=role`, { headers: h })).json()) as { role: string }[]
