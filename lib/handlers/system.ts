@@ -5,6 +5,7 @@ import { default as signals } from './signals.js'
 import { default as signalsKey } from './signals-key.js'
 import { reportMt5Trade } from './mt5-trade.js'
 import { mt5Account } from './mt5-account.js'
+import { membersStats } from './members.js'
 import { eaConfig } from './ea-config.js'
 import { paymentsSwitch } from './payments.js'
 
@@ -24,6 +25,7 @@ export default async function handler(req: Req, res: Res) {
   if (op === 'signals-key') return signalsKey(req as any, res as any)
   if (op === 'mt5-trade') return reportMt5Trade(req as any, res as any)
   if (op === 'mt5-account') return mt5Account(req as any, res as any)
+  if (op === 'members') return membersStats(req as any, res as any)
   if (op === 'ea-config') return eaConfig(req as any, res as any)
   if (op === 'payments') return paymentsSwitch(req as any, res as any)
   return res.status(404).json({ error: 'Unknown operation.' })

@@ -28,7 +28,37 @@ const LIMIT_FIELDS: [string, string, number][] = [
 const SMALL_FIELDS: [string, string, number][] = [['risk_budget_pct', 'Risk budget (% of equity)', 1], ['hard_stop_atr', 'Scalp emergency stop (× ATR)', 0.1], ['margin_use_max_pct', 'Max margin used (%)', 5]]
 const LIMIT_KEYS = [...LIMIT_FIELDS, ...SMALL_FIELDS].map((f) => f[0]).concat('small_account')
 
-function Settings({ uid, admin }: { uid: string; admin: boolean }) {
+// Admin only: the members card at the top of Settings.
+function MembersCard() {
+  const [s, setS] = useState<{ total_members: number; paying_active: number; receiving_signals: number; scanner_running: boolean } | null>(null)
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase.auth.getSession()
+      const res = await fetch('/api/system?op=members', { headers: { Authorization: `Bearer ${data.session?.access_token ?? ''}` } })
+      if (res.ok) setS(await res.json())
+    }
+    load()
+    const t = setInterval(load, 30000)
+    return () => clearInterval(t)
+  }, [])
+  const box = (label: string, value: string | number) => (
+    <div className="stat-box"><div className="mu" style={{ fontSize: 11 }}>{label}</div><div style={{ fontFamily: 'var(--mono)', fontSize: 20 }}>{value}</div></div>
+  )
+  return (
+    <div className="card">
+      <h3>Members</h3>
+      {!s && <p className="mu">Loading...</p>}
+      {s && <div className="stats-row">
+        {box('On the site', s.total_members)}
+        {box('Paying now', s.paying_active)}
+        {box('Receiving', s.receiving_signals)}
+        {box('Scanner', s.scanner_running ? 'on' : 'off')}
+      </div>}
+    </div>
+  )
+}
+
+function SettingsBody({ uid, admin }: { uid: string; admin: boolean }) {
   const [cfg, setCfg] = useState<Cfg>(DEFAULTS)
   const [msg, setMsg] = useState('')
   useEffect(() => {
@@ -281,4 +311,9 @@ export default function Profile({ profile, sub, botAccess, refresh, paymentsOn, 
       {tab === 'set' && botAccess && <Settings uid={profile.id} admin={admin} />}
     </>
   )
+}
+
+// Admin Settings: members card first, then the settings.
+function Settings({ uid, admin }: { uid: string; admin: boolean }) {
+  return <>{admin && <MembersCard />}<SettingsBody uid={uid} admin={admin} /></>
 }

@@ -221,3 +221,6 @@ body { letter-spacing: -0.005em; }
 .btn.p, .btn.start { background: var(--gloss-blue) !important; border-color: #2a4f93 !important; color: #fff !important; }
 .tabs button.on { background: radial-gradient(120% 90% at 50% 0%, #2c4f93 0%, #1d3a75 60%, #0f2347 100%) !important; }
 .acct-opt.on { border-color: #2a4f93 !important; }
+
+.stats-row { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:8px; margin-top:8px; }
+.stat-box { background:var(--rs); border:1px solid var(--ln); border-radius:12px; padding:10px 12px; }
